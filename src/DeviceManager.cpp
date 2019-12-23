@@ -5,7 +5,7 @@ DeviceManager::DeviceManager(PhysicalDevice *device)
     _device = device;
 
     _deviceConfigs.push_back(new int[3] {0, device->getLedCount(), 0});
-    _virtualDevices.push_back(new VirtualDevice(_device, 0, 0, _device->getLedCount()));
+    _virtualDevices.push_back(new VirtualDevice(_device, 0, _device->getLedCount()));
 }
 
 DeviceManager::DeviceManager(int ledCount)
@@ -13,7 +13,7 @@ DeviceManager::DeviceManager(int ledCount)
     _device = new PhysicalDevice(ledCount);
 
     _deviceConfigs.push_back(new int[3] {0, ledCount, 0});
-    _virtualDevices.push_back(new VirtualDevice(_device, 0, 0, ledCount)); // add a virtual device for the whole strip
+    _virtualDevices.push_back(new VirtualDevice(_device, 0, ledCount)); // add a virtual device for the whole strip
 }
 
 DeviceManager::~DeviceManager()
@@ -66,13 +66,13 @@ int DeviceManager::addDevice(int offset, int ledCount, int zIndex, int mode)
     
     for (int i = 0; i < hierarchy.size(); i++) {
         for (int j = 0; j < hierarchy[i].size(); j++) {
-            
+
         }
     }
 
 
     int id = _virtualDevices.size(); // id is equal to the index
-    _virtualDevices.push_back(new VirtualDevice(_device, id, offset, ledCount));
+    _virtualDevices.push_back(new VirtualDevice(_device, offset, ledCount));
 }
 
 bool DeviceManager::editDevice(int id, int offset, int ledCount, int zIndex, int mode)
@@ -92,10 +92,6 @@ bool DeviceManager::removeDevice(int id)
     if (id < _virtualDevices.size()) {
         delete _virtualDevices[id];
         _virtualDevices.erase(_virtualDevices.begin() + id);
-
-        for (int i = id; i < _virtualDevices.size(); i++) {
-            _virtualDevices[i]->setId(i);
-        }
 
         return true;
     }

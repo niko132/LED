@@ -3,7 +3,6 @@
 VirtualDevice::VirtualDevice(PhysicalDevice *device, int offset, int ledCount)
 {
     _device = device;
-    _pixelBuf = &device->getPixelBuf()[offset * 3];
     _ledCount = ledCount;
 }
 
