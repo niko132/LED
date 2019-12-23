@@ -9,6 +9,7 @@
 class DeviceManager {
     private:
         PhysicalDevice *_device;
+        std::vector<int*> _deviceConfigs;
         std::vector<VirtualDevice*> _virtualDevices;
 
     public:
@@ -18,8 +19,8 @@ class DeviceManager {
 
         void begin();
 
-        int addDevice(int offset, int ledCount);
-        bool editDevice(int id, int offset, int ledCount);
+        int addDevice(int offset, int ledCount, int zIndex, int mode);
+        bool editDevice(int id, int offset, int ledCount, int zIndex, int mode);
         bool removeDevice(int id);
 };
 
