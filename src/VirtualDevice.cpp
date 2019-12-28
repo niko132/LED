@@ -1,9 +1,12 @@
 #include "VirtualDevice.h"
 
-VirtualDevice::VirtualDevice(PhysicalDevice *device, int offset, int ledCount)
+VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex)
 {
     _device = device;
-    _ledCount = ledCount;
+    _startIndex = startIndex;
+    endIndex = endIndex;
+
+    //TODO generate random ID
 }
 
 void VirtualDevice::begin()
@@ -11,18 +14,44 @@ void VirtualDevice::begin()
     
 }
 
-void VirtualDevice::setOffset(int offset)
+void VirtualDevice::setStartIndex(int startIndex)
 {
-    _offset = offset;
+    _startIndex = startIndex;
 }
 
-void VirtualDevice::setLedCount(int ledCount)
+void VirtualDevice::setEnddIndex(int endIndex)
 {
-    _ledCount = ledCount;
+    _endIndex = endIndex;
 }
 
-void VirtualDevice::removeArea(int startIndex, int length)
+void VirtualDevice::resetAreas()
 {
+    _subIndices.clear();
+    _subIndices.push_back(new int[2] {_startIndex, _endIndex});
+}
+
+void VirtualDevice::removeArea(int startIndex, int endIndex)
+{
+    for (int i = _subIndices.size() - 1; i >= 0; i--) {
+        if (startIndex <= _subIndices[i][0] && endIndex >= _subIndices[i][0] && endIndex < _subIndices[i][1]) {
+            _subIndices[i][0] = endIndex + 1;
+        } else if (endIndex >= _subIndices[i][1] && startIndex <= _subIndices[i][1] && startIndex > _subIndices[i][0]) {
+            _subIndices[i][1] = startIndex - 1;
+        } else if (startIndex > _subIndices[i][0] && endIndex < _subIndices[i][1]) {
+            int *a = new int[2] {_subIndices[i][0], startIndex};
+            int *b = new int[2] {endIndex, _subIndices[i][1]};
+
+            _subIndices.erase(_subIndices.begin() + i);
+            _subIndices.insert(_subIndices.begin() + i, a);
+            _subIndices.insert(_subIndices.begin() + 1, b);
+        } else if (startIndex <= _subIndices[i][0] && endIndex >= _subIndices[i][1]) {
+            _subIndices.erase(_subIndices.begin() + i);
+        }
+    }
+
+
+
+    /*
     std::vector<int*> indices;
 
     indices.push_back(new int[2] {_offset, _offset + _ledCount});
@@ -41,4 +70,26 @@ void VirtualDevice::removeArea(int startIndex, int length)
             indices.push_back(b);
         }
     }
+    */
+}
+
+int VirtualDevice::getStartIndex()
+{
+    return _startIndex;
+}
+
+int VirtualDevice::getEndIndex()
+{
+    return _endIndex;
+}
+
+int VirtualDevice::getLedCount()
+{
+    // TODO: implement LedCount with subindices
+    return _endIndex - _startIndex;
+}
+
+int VirtualDevice::getId()
+{
+    return _id;
 }

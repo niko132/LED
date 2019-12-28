@@ -6,20 +6,27 @@
 class VirtualDevice {
     private:
         PhysicalDevice *_device;
-        int _offset;
-        int _ledCount;
+        int _startIndex;
+        int _endIndex;
+        int _id;
 
-        std::vector<VirtualDevice*> _subdevices;
+        std::vector<int*> _subIndices;
 
     public:
-        VirtualDevice(PhysicalDevice *device, int offset, int ledCount);
+        VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex);
 
         void begin();
 
-        void setOffset(int offset);
-        void setLedCount(int ledCount);
+        void setStartIndex(int startIndex);
+        void setEnddIndex(int endIndex);
 
-        void removeArea(int startIndex, int length);
+        void resetAreas();
+        void removeArea(int startIndex, int endIndex);
+
+        int getStartIndex();
+        int getEndIndex();
+        int getLedCount();
+        int getId();
 };
 
 #endif // VIRTUALDEVICE_H

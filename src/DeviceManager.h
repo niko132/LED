@@ -12,6 +12,8 @@ class DeviceManager {
         std::vector<int*> _deviceConfigs;
         std::vector<VirtualDevice*> _virtualDevices;
 
+        std::vector<std::vector<VirtualDevice*>*> _deviceHierarchy;
+
     public:
         DeviceManager(PhysicalDevice *device);
         DeviceManager(int ledCount);
@@ -19,9 +21,14 @@ class DeviceManager {
 
         void begin();
 
-        int addDevice(int offset, int ledCount, int zIndex, int mode);
-        bool editDevice(int id, int offset, int ledCount, int zIndex, int mode);
+        int addDevice(int startIndex, int endIndex, int zIndex, int mode);
+        void addDevice(VirtualDevice *newDevice, int zIndex);
+        bool editDevice(int id, int startIndex, int endIndex, int zIndex, int mode);
+        void editDevice(VirtualDevice *device, int startIndex, int endIndex, int zIndex, int mode);
         bool removeDevice(int id);
+        bool removeDevice(VirtualDevice *device);
+
+        void buildDevices();
 };
 
 #endif // DEVICEMANAGER_H

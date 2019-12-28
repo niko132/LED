@@ -42,59 +42,119 @@ void DeviceManager::begin()
     }
 }
 
-int DeviceManager::addDevice(int offset, int ledCount, int zIndex, int mode)
+int DeviceManager::addDevice(int startIndex, int endIndex, int zIndex, int mode)
 {
-    _deviceConfigs.push_back(new int[4] {offset, ledCount, zIndex, mode});
+    VirtualDevice *newDevice = new VirtualDevice(_device, startIndex, endIndex);
+    addDevice(newDevice, zIndex);
 
-    std::vector<int*> configs = _deviceConfigs;
-
-    std::vector<std::vector<int*>> hierarchy;
-
-    while(configs.size()) {
-        std::vector<int*> hierElem;
-
-        for (int i = configs.size() - 1; i >= 0; i--) {
-            if (configs[i][2] == hierarchy.size()) {
-                hierElem.push_back(configs[i]);
-                configs.erase(configs.begin() + i);
-            }
-        }
-
-        hierarchy.push_back(hierElem);
-    }
-
-    
-    for (int i = 0; i < hierarchy.size(); i++) {
-        for (int j = 0; j < hierarchy[i].size(); j++) {
-
-        }
-    }
-
-
-    int id = _virtualDevices.size(); // id is equal to the index
-    _virtualDevices.push_back(new VirtualDevice(_device, offset, ledCount));
+    return newDevice->getId();
 }
 
-bool DeviceManager::editDevice(int id, int offset, int ledCount, int zIndex, int mode)
-{
-    if (id < _virtualDevices.size()) {
-        _virtualDevices[id]->setOffset(offset);
-        _virtualDevices[id]->setLedCount(ledCount);
+void DeviceManager::addDevice(VirtualDevice *newDevice, int zIndex) {
+    int startIndex = newDevice->getStartIndex();
+    int endIndex = newDevice->getEndIndex();
 
-        return true;
+    if (zIndex >= _deviceHierarchy.size()) {
+        _deviceHierarchy.push_back(new std::vector<VirtualDevice*>());
+        zIndex = _deviceHierarchy.size() - 1;
+    }
+
+    for (int i = _deviceHierarchy[zIndex]->size() - 1; i = 0; i--) {
+        int start = _deviceHierarchy[zIndex]->at(i)->getStartIndex();
+        int end = _deviceHierarchy[zIndex]->at(i)->getEndIndex();
+
+        if (start < startIndex && end >= startIndex) {
+            _deviceHierarchy[zIndex]->at(i)->setEnddIndex(startIndex - 1);
+        } else if (start <= endIndex && end > endIndex) {
+            _deviceHierarchy[zIndex]->at(i)->setStartIndex(end);
+        } else if (start >= startIndex && end <= endIndex) {
+            _deviceHierarchy[zIndex]->erase(_deviceHierarchy[zIndex]->begin() + i);
+        }
+    }
+
+    for (int i = 0; i < _deviceHierarchy[zIndex]->size(); i++) {
+        if (startIndex < _deviceHierarchy[zIndex]->at(i)->getStartIndex()) {
+            _deviceHierarchy[zIndex]->insert(_deviceHierarchy[zIndex]->begin() + i, newDevice);
+        }
+    }
+
+    buildDevices();
+}
+
+bool DeviceManager::editDevice(int id, int startIndex, int endIndex, int zIndex, int mode)
+{
+    for (int row = 0; row < _deviceHierarchy.size(); row++) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            if (id == _deviceHierarchy[row]->at(col)->getId()) {
+                editDevice(_deviceHierarchy[row]->at(col), startIndex, endIndex, zIndex, mode);
+                return true;
+            }
+        }
     }
 
     return false;
+}
+
+void DeviceManager::editDevice(VirtualDevice *device, int startIndex, int endIndex, int zIndex, int mode)
+{
+    removeDevice(device);
+
+    device->setStartIndex(startIndex);
+    device->setEnddIndex(endIndex);
+    // device->setMode(mode);
+
+    addDevice(device, zIndex);
 }
 
 bool DeviceManager::removeDevice(int id)
 {
-    if (id < _virtualDevices.size()) {
-        delete _virtualDevices[id];
-        _virtualDevices.erase(_virtualDevices.begin() + id);
-
-        return true;
+    for (int row = 0; row < _deviceHierarchy.size(); row++) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            if (id == _deviceHierarchy[row]->at(col)->getId()) {
+                return removeDevice(_deviceHierarchy[row]->at(col));
+            }
+        }
     }
 
     return false;
+}
+
+bool DeviceManager::removeDevice(VirtualDevice *device)
+{
+    bool found = false;
+
+    for (int row = _deviceHierarchy.size() - 1; row >= 0; row++) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            if (_deviceHierarchy[row]->at(col) == device) {
+                _deviceHierarchy[row]->erase(_deviceHierarchy[row]->begin() + col);
+                found = true;
+                break;
+            }
+        }
+
+        if (_deviceHierarchy[row]->empty()) {
+            _deviceHierarchy.erase(_deviceHierarchy.begin() + row);
+        }
+    }
+
+    buildDevices();
+
+    return found;
+}
+
+void DeviceManager::buildDevices() {
+    for (int row = _deviceHierarchy.size() - 2; row >= 0; row--) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            _deviceHierarchy[row]->at(col)->resetAreas();
+
+            for (int innerRow = _deviceHierarchy.size() - 1; innerRow > row; innerRow--) {
+                for (int innerCol = 0; innerCol < _deviceHierarchy[innerRow]->size(); innerCol++) {
+                    int start = _deviceHierarchy[innerRow]->at(innerCol)->getStartIndex();
+                    int end = _deviceHierarchy[innerRow]->at(innerCol)->getEndIndex();
+
+                    _deviceHierarchy[row]->at(col)->removeArea(start, end);
+                }
+            }
+        }
+    }
 }
