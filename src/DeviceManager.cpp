@@ -1,11 +1,14 @@
 #include "DeviceManager.h"
 
+#include <stdio.h>
+#include <iostream>
+
 DeviceManager::DeviceManager(PhysicalDevice *device)
 {
     _device = device;
 
     _deviceConfigs.push_back(new int[3] {0, device->getLedCount(), 0});
-    _virtualDevices.push_back(new VirtualDevice(_device, 0, _device->getLedCount()));
+    _virtualDevices.push_back(new VirtualDevice(_device, 0, _device->getLedCount(), 0));
 }
 
 DeviceManager::DeviceManager(int ledCount)
@@ -13,7 +16,7 @@ DeviceManager::DeviceManager(int ledCount)
     _device = new PhysicalDevice(ledCount);
 
     _deviceConfigs.push_back(new int[3] {0, ledCount, 0});
-    _virtualDevices.push_back(new VirtualDevice(_device, 0, ledCount)); // add a virtual device for the whole strip
+    _virtualDevices.push_back(new VirtualDevice(_device, 0, ledCount, 0)); // add a virtual device for the whole strip
 }
 
 DeviceManager::~DeviceManager()
@@ -44,7 +47,7 @@ void DeviceManager::begin()
 
 int DeviceManager::addDevice(int startIndex, int endIndex, int zIndex, int mode)
 {
-    VirtualDevice *newDevice = new VirtualDevice(_device, startIndex, endIndex);
+    VirtualDevice *newDevice = new VirtualDevice(_device, startIndex, endIndex, mode);
     addDevice(newDevice, zIndex);
 
     return newDevice->getId();
@@ -101,7 +104,7 @@ void DeviceManager::editDevice(VirtualDevice *device, int startIndex, int endInd
 
     device->setStartIndex(startIndex);
     device->setEnddIndex(endIndex);
-    // device->setMode(mode);
+    device->setMode(mode);
 
     addDevice(device, zIndex);
 }
@@ -155,6 +158,31 @@ void DeviceManager::buildDevices() {
                     _deviceHierarchy[row]->at(col)->removeArea(start, end);
                 }
             }
+        }
+    }
+}
+
+void DeviceManager::update()
+{
+    for (int row = 0; row < _deviceHierarchy.size(); row++) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            _deviceHierarchy[row]->at(col)->update();
+        }
+    }
+}
+
+void DeviceManager::debug()
+{
+    for (int row = 0; row < _deviceHierarchy.size(); row++) {
+        for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
+            for (int i = 0; i < _device->getLedCount(); i++) {
+                if (i >= _deviceHierarchy[row]->at(col)->getStartIndex() && i < _deviceHierarchy[row]->at(col)->getEndIndex())
+                    std::cout << i;
+                else
+                    std::cout << "*";
+            }
+
+            std::cout << std::endl;
         }
     }
 }

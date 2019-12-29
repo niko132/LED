@@ -16,6 +16,9 @@ class PhysicalDevice {
         void begin();
         int getLedCount();
         unsigned char* getPixelBuf();
+        
+        void clear();
+        void update();
 };
 
 #endif // PHYSICALDEVICE_H

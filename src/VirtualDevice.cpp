@@ -1,17 +1,26 @@
 #include "VirtualDevice.h"
+#include "ColorCycle.h"
 
-VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex)
+#include <FastLED.h>
+
+VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode)
 {
     _device = device;
     _startIndex = startIndex;
-    endIndex = endIndex;
+    _endIndex = endIndex;
+    _mode = mode;
 
-    //TODO generate random ID
+    //TODO: update id generation
+    _id = ESP.getCycleCount();
+
+    // default effect
+    _effect = new ColorCycle();
 }
 
 void VirtualDevice::begin()
 {
-    
+    // TODO: maybe move to constructor
+    resetAreas();
 }
 
 void VirtualDevice::setStartIndex(int startIndex)
@@ -22,6 +31,11 @@ void VirtualDevice::setStartIndex(int startIndex)
 void VirtualDevice::setEnddIndex(int endIndex)
 {
     _endIndex = endIndex;
+}
+
+void VirtualDevice::setMode(int mode)
+{
+    _mode = mode;
 }
 
 void VirtualDevice::resetAreas()
@@ -89,7 +103,46 @@ int VirtualDevice::getLedCount()
     return _endIndex - _startIndex;
 }
 
-int VirtualDevice::getId()
+int VirtualDevice::getMode()
+{
+    return _mode;
+}
+
+unsigned long VirtualDevice::getId()
 {
     return _id;
+}
+
+void VirtualDevice::update()
+{
+    double timeValue = 0.0;
+
+    // TODO: update time value
+
+    // set everything to black
+    _device->clear();
+
+    for (int i = 0; i < _subIndices.size(); i++) {
+        for (int index = _subIndices[i][0]; index < _subIndices[i][1]; i++) {
+            double posValue = 0.0;
+
+            if (_mode == 0) {
+                posValue = (double) (index - _startIndex) / (double) getLedCount();
+            }
+
+            // TODO: implement effect updating
+            // effect.update(timeValue, posValue, &_device->getPixelBuf()[index * 3]);
+
+            CRGB color = _effect->update(timeValue, posValue);
+
+            // post process color...
+
+            unsigned char* p = &_device->getPixelBuf()[index * 3];
+            p[0] = color.r;
+            p[1] = color.g;
+            p[2] = color.b;
+        }
+    }
+
+    _device->update();
 }

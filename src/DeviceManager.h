@@ -29,6 +29,10 @@ class DeviceManager {
         bool removeDevice(VirtualDevice *device);
 
         void buildDevices();
+
+        void update();
+
+        void debug();
 };
 
 #endif // DEVICEMANAGER_H

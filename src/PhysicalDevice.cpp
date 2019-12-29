@@ -1,5 +1,7 @@
 #include "PhysicalDevice.h"
 
+#include <stdio.h>
+
 PhysicalDevice::PhysicalDevice(int ledCount) :
     _strip(ledCount)
 {
@@ -28,4 +30,18 @@ int PhysicalDevice::getLedCount()
 unsigned char* PhysicalDevice::getPixelBuf()
 {
     return _pixelBuf;
+}
+
+void PhysicalDevice::clear()
+{
+    memset(_pixelBuf, 0, _ledCount);
+}
+
+void PhysicalDevice::update()
+{
+    for (int i = 0; i < _ledCount; i++) {
+        _strip.SetPixelColor(i, RgbColor(_pixelBuf[i * 3], _pixelBuf[i * 3 + 1], _pixelBuf[i * 3 + 2]));
+    }
+
+    _strip.Show();
 }
