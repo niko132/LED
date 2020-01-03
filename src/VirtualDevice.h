@@ -37,6 +37,8 @@ class VirtualDevice {
         unsigned long getId();
 
         void update();
+
+        void debug();
 };
 
 #endif // VIRTUALDEVICE_H

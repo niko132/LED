@@ -3,6 +3,9 @@
 
 #include <FastLED.h>
 
+#include <stdio.h>
+#include <iostream>
+
 VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode)
 {
     _device = device;
@@ -15,12 +18,14 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
 
     // default effect
     _effect = new ColorCycle();
+
+    resetAreas();
 }
 
 void VirtualDevice::begin()
 {
     // TODO: maybe move to constructor
-    resetAreas();
+    
 }
 
 void VirtualDevice::setStartIndex(int startIndex)
@@ -48,9 +53,9 @@ void VirtualDevice::removeArea(int startIndex, int endIndex)
 {
     for (int i = _subIndices.size() - 1; i >= 0; i--) {
         if (startIndex <= _subIndices[i][0] && endIndex >= _subIndices[i][0] && endIndex < _subIndices[i][1]) {
-            _subIndices[i][0] = endIndex + 1;
+            _subIndices[i][0] = endIndex;
         } else if (endIndex >= _subIndices[i][1] && startIndex <= _subIndices[i][1] && startIndex > _subIndices[i][0]) {
-            _subIndices[i][1] = startIndex - 1;
+            _subIndices[i][1] = startIndex;
         } else if (startIndex > _subIndices[i][0] && endIndex < _subIndices[i][1]) {
             int *a = new int[2] {_subIndices[i][0], startIndex};
             int *b = new int[2] {endIndex, _subIndices[i][1]};
@@ -123,7 +128,7 @@ void VirtualDevice::update()
     _device->clear();
 
     for (int i = 0; i < _subIndices.size(); i++) {
-        for (int index = _subIndices[i][0]; index < _subIndices[i][1]; i++) {
+        for (int index = _subIndices[i][0]; index < _subIndices[i][1]; index++) {
             double posValue = 0.0;
 
             if (_mode == 0) {
@@ -145,4 +150,24 @@ void VirtualDevice::update()
     }
 
     _device->update();
+}
+
+void VirtualDevice::debug()
+{
+    for (int i = _startIndex; i < _endIndex; i++) {
+        bool found = false;
+
+        for (int j = 0; j < _subIndices.size(); j++) {
+            if (i >= _subIndices[j][0] && i < _subIndices[j][1]) {
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            std::cout << i << " ";
+        } else {
+            std::cout << "*" << " ";
+        }
+    }
 }

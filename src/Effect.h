@@ -10,6 +10,9 @@ class Effect {
         Palette *_palette;
 
     public:
+        Effect() {
+            _palette = new Palette();
+        };
         virtual CRGB update(double timeValue, double posValue) = 0;
 };
 
