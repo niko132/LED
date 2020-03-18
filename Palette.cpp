@@ -1,10 +1,36 @@
 #include "Palette.h"
 
+Palette::Palette()
+{
+	
+}
+
+Palette::Palette(std::vector<ColorKey> colors)
+{
+	_colors = new std::vector<ColorKey>(colors);
+}
+
+Palette::~Palette()
+{
+	if (_precalculated) {
+		delete[] _precalculated;
+		_precalculated = NULL;
+	}
+	
+	if (_colors) {
+		delete _colors;
+		_colors = NULL;
+	}
+}
+
 void Palette::precalculate(int maxResolution)
 {
+	if (!_colors)
+		return;
+	
 	_precalculated = new unsigned char[maxResolution * 3];
 
-    if (_colors.size() == 0) {
+    if (_colors->size() == 0) {
         memset(_precalculated, 0, maxResolution * 3);
         return;
     }
@@ -12,26 +38,26 @@ void Palette::precalculate(int maxResolution)
 	for (int i = 0; i < maxResolution; i++) {
 		float value = (float) i / maxResolution;
 	
-		int index1 = _colors.size() - 1;
+		int index1 = _colors->size() - 1;
 				
-		for (int i = 0; i < _colors.size(); i++) {
-			if (_colors[i].pos > value)
+		for (int i = 0; i < _colors->size(); i++) {
+			if (_colors->at(i).pos > value)
 				break;
 					
 			index1 = i;
 		}
 				
-		int index2 = (index1 + 1) % _colors.size();
+		int index2 = (index1 + 1) % _colors->size();
 				
-		CRGB color1 = _colors[index1].color;
-		CRGB color2 = _colors[index2].color;
+		CRGB color1 = _colors->at(index1).color;
+		CRGB color2 = _colors->at(index2).color;
 				
-		float frac1 = value - _colors[index1].pos;
+		float frac1 = value - _colors->at(index1).pos;
 				
 		if (frac1 < 0)
 			frac1 += 1.0f;
 				
-		float frac2 = _colors[index2].pos - _colors[index1].pos;
+		float frac2 = _colors->at(index2).pos - _colors->at(index1).pos;
 				
 		if (frac2 <= 0)
 			frac2 += 1.0f;
@@ -53,10 +79,15 @@ void Palette::precalculate(int maxResolution)
 		_precalculated[3 * i + 1] = color.g;
 		_precalculated[3 * i + 2] = color.b;
 	}
+	
+	
+	delete _colors;
+	_colors = NULL;
 }
 
-CRGB Palette::getColorAtPosition(double pos) {	
-	unsigned int resolution = 256;
+CRGB Palette::getColorAtPosition(double pos) {
+	// TODO: increase resolution -> keep heap in mind!!!
+	unsigned int resolution = 180;
     double brightness = 1.0;
 	
 	unsigned int index = pos * resolution;

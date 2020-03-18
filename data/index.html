@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+		<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+		<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+	</head>
+	<body>
+		<h1>LED</h1>
+		<div>
+			<input type="checkbox" id="on_off" name="on_off">
+			<label for="on_off">On</label><br>
+			<button type="button" id="add_device">Add Device</button>
+		</div>
+		<div id="container">
+		</div>
+	</body>
+	
+	<script>
+loadData();
+
+$('#on_off').change(function() {
+	var val = $(this).is(':checked');
+
+	$.ajax({
+		url: '/set_on_off/',
+		type: 'POST',
+		data: JSON.stringify({on: val}),
+		contentType: 'application/json',
+		dataType:'json'
+	});
+});
+
+$('#add_device').click(function() {
+	$.ajax({
+		url: '/add_device/',
+		type: 'POST',
+		data: JSON.stringify({startIndex: 0, endIndex: 180, zIndex: 999}),
+		contentType: 'application/json',
+		success: function(){
+			loadData();
+		}
+	});
+});
+
+function loadData() {
+	$.getJSON("/get_devices", function(data) {
+		var container = $('#container');
+		
+		container.empty();
+	
+		$.each(data, function(i, item) {
+			console.log(item.id);
+			createDeviceBlock(item).appendTo(container);
+		});
+	});
+}
+
+function createDeviceBlock(device) {
+	var container = $('<div>');
+	
+	var title = $('<h2>', {'text': device.id});
+	
+	var deleteButton = $('<button>', {
+		'type': 'button',
+		'text': 'Delete',
+		on: {
+			click: function() {
+				$.ajax({
+					url: '/remove_device/',
+					type: 'POST',
+					data: JSON.stringify({id: device.id}),
+					contentType: 'application/json',
+					success: function(){
+						loadData();
+					}
+				});
+			}
+		}
+	});
+	
+	/*
+	var startIndexSlider = createSlider(0, 179, device.startIndex, 'startIndex', function(val) {
+		$.ajax({
+			url: '/edit_device/',
+			type: 'POST',
+			data: JSON.stringify({id: device.id, startIndex: val}),
+			contentType: 'application/json',
+			dataType:'json',
+			success: function(){
+				loadData();
+			}
+		});
+	});
+	var endIndexSlider = createSlider(1, 180, device.endIndex, 'endIndex', function(val) {
+		$.ajax({
+			url: '/edit_device/',
+			type: 'POST',
+			data: JSON.stringify({id: device.id, endIndex: val}),
+			contentType: 'application/json',
+			dataType:'json',
+			success: function(){
+				loadData();
+			}
+		});
+	});
+	*/
+	
+	var rangeSlider = createDoubleSlider(0, 180, device.startIndex, device.endIndex, 6343876, function(val1, val2) {
+		$.ajax({
+			url: '/edit_device/',
+			type: 'POST',
+			data: JSON.stringify({id: device.id, startIndex: val1, endIndex: val2}),
+			contentType: 'application/json',
+			success: function(){
+				loadData();
+			}
+		});
+	});
+	
+	var ledCount = $('<p>', {'text': device.ledCount});
+	var ledRangeCount = $('<p>', {'text': device.ledRangeCount});
+	
+	container.append(title);
+	container.append(deleteButton);
+	/*
+	container.append(startIndexSlider);
+	container.append(endIndexSlider);
+	*/
+	container.append(rangeSlider);
+	container.append(ledCount);
+	container.append(ledRangeCount);
+	
+	var posSlider = createDoubleSlider(0, 100, device.posStart * 100, device.posEnd * 100, 6343876, function(val1, val2) {
+		$.ajax({
+			url: '/' + device.id + '/set_pos',
+			type: 'POST',
+			data: JSON.stringify({posStart: (val1 / 100.0), posEnd: (val2 / 100.0)}),
+			contentType: 'application/json',
+			success: function(){
+				loadData();
+			}
+		});
+	});
+	
+	container.append(posSlider);
+	
+	$.getJSON("/" + device.id + "/get_effects", function(data) {
+		var l = [];
+		
+		$.each(data, function(i, item) {
+			var row = {};
+			row.value = item.index;
+			row.name = item.name;
+			
+			l.push(row);
+		});
+	
+		var select = createSelectList(l, function(val) {
+			$.ajax({
+				url: '/' + device.id + '/set_effect',
+				type: 'POST',
+				data: JSON.stringify({index: val}),
+				contentType: 'application/json'
+			});
+		});
+		container.append(select);
+	});
+	
+	$.getJSON("/get_syncable_devices", function(data) {
+		var l = [];
+		var lookup = [];
+		
+		l.push({value: -1, name: '-'});
+		
+		var index = 0;
+		
+		$.each(data, function(key, value) {
+			$.each(value, function(i, item) {
+				var row = {};
+				var rowValue = {};
+				
+				rowValue.ip = key;
+				rowValue.id = item;
+				
+				row.value = index;
+				row.name = key + ' - ' + item;
+				
+				l.push(row);
+				lookup.push(rowValue);
+				
+				index = index + 1;
+			});
+		});
+	
+		var select = createSelectList(l, function(val) {
+			
+		});
+		
+		var subContainer = $('<div>');
+		
+		var button = $('<button>', {
+			'type': 'button',
+			'text': 'Sync!',
+			on: {
+				click: function() {
+					// TODO: look for other implementation
+					var val = select[0].value;
+					
+					if (val != -1) {
+						console.log(lookup[val]);
+						var sync = lookup[val];
+						
+						$.ajax({
+							url: '/' + device.id + '/start_sync',
+							type: 'POST',
+							data: JSON.stringify({ip: sync.ip, id: sync.id}),
+							contentType: 'application/json',
+							success: function(){
+								console.log('Synced!');
+							}
+						});
+					}
+				}
+			}
+		});
+		
+		subContainer.append(select);
+		subContainer.append(button);
+		
+		container.append(subContainer);
+	});
+	
+	return container;
+}
+
+function createSelectList(data, callback) {
+	var select = $('<select>', {
+		on: {
+			change: function() {
+				callback(this.value);
+			}
+		}
+	});
+	
+	$.each(data, function(i, item) {
+		var option = $('<option>', {'value': item.value, 'text': item.name});
+		select.append(option);
+	});
+	
+	return select;
+}
+
+function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
+	var container = $('<div>');
+	
+	var output1 = $('<p>', {'text': 'Value: '});
+	var output2 = $('<span>', {'id': idVal + 'Output'});
+	output2.text(val1 + ' - ' + val2);
+	
+	var input = $('<div>');
+	
+	input.slider({
+		range: true,
+		min: minVal,
+		max: maxVal,
+		values: [ val1, val2 ],
+		change: function(event, ui) {
+			output2.text(ui.values[0] + ' - ' + ui.values[1]);
+			callback(ui.values[0], ui.values[1]);
+		}
+	});
+	
+	output1.append(output2);
+	
+	container.append(input);
+	container.append(output1);
+	
+	return container;
+}
+
+function createSlider(minVal, maxVal, currVal, idVal, callback) {
+	var container = $('<div>');
+	
+	var output1 = $('<p>', {'text': 'Value:'});
+	var output2 = $('<span>', {'id': idVal + 'Output'});
+	var input = $('<input>', {
+		'type': 'range',
+		'min': minVal,
+		'max': maxVal,
+		'value': currVal,
+		'class': 'slider',
+		'id': idVal,
+		on: {
+			change: function() {
+				output2.text(this.value);
+				callback(this.value);
+			}
+		}
+	});
+	
+	output1.append(output2);
+	
+	container.append(input);
+	container.append(output1);
+	
+	return container;
+};
+	</script>
+</html>

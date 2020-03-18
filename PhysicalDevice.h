@@ -6,7 +6,8 @@
 class PhysicalDevice {
     private:
         int _ledCount;
-        NeoPixelBus<NeoRgbFeature, NeoEsp8266Dma800KbpsMethod> _strip;
+		bool _mirror;
+        NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> _strip;
         unsigned char* _pixelBuf;
 
     public:

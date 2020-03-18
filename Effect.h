@@ -7,12 +7,19 @@
 
 class Effect {
     protected:
+		String _name;
         Palette *_palette;
 
     public:
-        Effect() {
-            _palette = new Palette();
+        Effect(String name, Palette *palette) {
+			_name = name;
+			_palette = palette;
         };
+		
+		String getName() {
+			return _name;
+		};
+		
         virtual CRGB update(double timeValue, double posValue) = 0;
 };
 
