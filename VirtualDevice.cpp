@@ -1,10 +1,13 @@
 #include "VirtualDevice.h"
 
+#include "PaletteManager.h"
+
 #include "ColorCycle.h"
 #include "ColorFade.h"
 #include "StaticColor.h"
 #include "Snake.h"
 #include "PingPong.h"
+#include "CustomEffect.h"
 
 #include <FastLED.h>
 #include <AsyncJson.h>
@@ -20,6 +23,7 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
     //TODO: update id generation
     _id = ESP.getCycleCount();
 	
+	/*
 	// generate default rainbow palette
 	std::vector<ColorKey> colors;
 	
@@ -31,6 +35,9 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
 	}
 			
     _palette = new Palette(colors);
+	*/
+	
+	_palette = Palettes.getPalette("rainbow", getLedRangeCount());
 	
 
     // default effect
@@ -138,9 +145,20 @@ void VirtualDevice::begin(AsyncWebServer *server)
 		}
 	});
 	
+	AsyncCallbackJsonWebHandler *customHandler = new AsyncCallbackJsonWebHandler("/" + String(_id) + "/custom_effect", [this](AsyncWebServerRequest *request, JsonVariant &json) {
+		String effectJson;
+		
+		serializeJson(json, effectJson);
+		
+		_effect = new CustomEffect(_palette, effectJson);
+		
+		request->send(200, "text/plain", "Ok");
+	}, 5 * 1024);
+	
 	server->addHandler(_effectHandler);
 	server->addHandler(_posHandler);
 	server->addHandler(_syncHandler);
+	server->addHandler(customHandler);
 	
 	server->on(String("/" + String(_id) + "/get_effects").c_str(), HTTP_GET, [this](AsyncWebServerRequest *request){		
 		AsyncJsonResponse *response = new AsyncJsonResponse();

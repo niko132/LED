@@ -12,12 +12,15 @@ typedef struct {
 class Palette {
     private:
         std::vector<ColorKey> *_colors;
+		unsigned int _resolution = 0;
         unsigned char *_precalculated = NULL;
 
     public:
 		Palette();
 		Palette(std::vector<ColorKey> colors);
 		~Palette();
+		
+		unsigned int getResolution();
         void precalculate(int maxResolution);
         CRGB getColorAtPosition(double pos);
 };

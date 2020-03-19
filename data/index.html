@@ -267,8 +267,10 @@ function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
 		max: maxVal,
 		values: [ val1, val2 ],
 		change: function(event, ui) {
-			output2.text(ui.values[0] + ' - ' + ui.values[1]);
 			callback(ui.values[0], ui.values[1]);
+		},
+		slide: function(event, ui) {
+			output2.text(ui.values[0] + ' - ' + ui.values[1]);
 		}
 	});
 	

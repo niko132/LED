@@ -149,8 +149,8 @@ void DeviceManager::begin(AsyncWebServer *server)
 	server->addHandler(onOffHandler);
 	
 	server->on("/get_devices", HTTP_GET, [this](AsyncWebServerRequest *request){		
-		AsyncJsonResponse *response = new AsyncJsonResponse();
-		JsonArray root = response->getRoot().to<JsonArray>();
+		AsyncJsonResponse *response = new AsyncJsonResponse(4 * 1024, true);
+		JsonArray root = response->getRoot().as<JsonArray>();
 		
 		for (int i = 0; i < getDeviceCount(); i++) {
 			JsonObject deviceObject = root.createNestedObject();

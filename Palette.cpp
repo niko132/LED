@@ -23,10 +23,20 @@ Palette::~Palette()
 	}
 }
 
+unsigned int Palette::getResolution()
+{
+	return _resolution;
+}
+
 void Palette::precalculate(int maxResolution)
 {
 	if (!_colors)
 		return;
+	
+	if (_precalculated) {
+		delete[] _precalculated;
+		_precalculated = NULL;
+	}
 	
 	_precalculated = new unsigned char[maxResolution * 3];
 
@@ -79,6 +89,8 @@ void Palette::precalculate(int maxResolution)
 		_precalculated[3 * i + 1] = color.g;
 		_precalculated[3 * i + 2] = color.b;
 	}
+	
+	_resolution = maxResolution;
 	
 	
 	delete _colors;
