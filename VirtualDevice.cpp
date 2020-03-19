@@ -147,9 +147,15 @@ void VirtualDevice::begin(AsyncWebServer *server)
 	
 	AsyncCallbackJsonWebHandler *customHandler = new AsyncCallbackJsonWebHandler("/" + String(_id) + "/custom_effect", [this](AsyncWebServerRequest *request, JsonVariant &json) {
 		String effectJson;
-		
 		serializeJson(json, effectJson);
 		
+		// delete old effect
+		if (_effect) {
+			delete _effect;
+			_effect = NULL;
+		}
+		
+		// create the new one
 		_effect = new CustomEffect(_palette, effectJson);
 		
 		request->send(200, "text/plain", "Ok");
@@ -322,9 +328,10 @@ unsigned long VirtualDevice::getId()
 
 void VirtualDevice::update(unsigned long delta)
 {
-	delta = delta % 5000; // 5 secs
-	double timeValue = _lastTimeValue + (double) delta / 5000.0;
-		
+	unsigned long duration = (unsigned long) (_effect->getDuration() * 1000.0);
+	
+	delta = delta % duration; // 5 secs
+	double timeValue = _lastTimeValue + (double) delta / duration;
 	timeValue -= (int) timeValue;
 	
 	int ledCount = 0;

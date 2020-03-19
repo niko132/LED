@@ -1,1 +1,1 @@
-"C:\Users\Niko\AppData\Local\Arduino15\packages\esp8266\tools\python3\3.7.2-post1\python3.exe" "C:\Users\Niko\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.3\tools\espota.py" -i 192.168.178.113 -s -f "C:\Users\Niko\AppData\Local\Temp\arduino_build_395794\LED.spiffs.bin"
+"C:\Users\Niko\AppData\Local\Arduino15\packages\esp8266\tools\python3\3.7.2-post1\python3.exe" "C:\Users\Niko\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.3\tools\espota.py" -i 192.168.178.113 -s -f "C:\Users\Niko\AppData\Local\Temp\arduino_build_731506\LED.spiffs.bin"

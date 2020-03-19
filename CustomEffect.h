@@ -11,27 +11,14 @@ class CustomEffect : public Effect {
 	private:
 		CRGB _color;
 		
+		unsigned int _numParams = 0;
+		unsigned int _numTemps = 0;
+		unsigned int _numVals = 0;
 		unsigned int _numOps = 0;
 		unsigned char *_ops;
 		double *_vars = NULL;
 		
-		unsigned char getUnaryReg(JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
-		{
-			JsonObject op = *operation;
-			unsigned char reg = 0;
-			
-			if (op.containsKey("reg"))
-				reg = op["reg"].as<unsigned char>();
-			else if (op.containsKey("val")) {
-				double val = op["val"].as<double>();
-				vals->push_back(val);
-				reg = valsOffset + vals->size() - 1;
-			}
-			
-			return reg;
-		}
-		
-		unsigned char getBinaryReg(JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset, unsigned char num)
+		unsigned char getReg(String num, JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
 		{
 			JsonObject op = *operation;
 			unsigned char reg = 0;
@@ -47,6 +34,11 @@ class CustomEffect : public Effect {
 			return reg;
 		}
 		
+		unsigned char getReg(JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
+		{
+			return getReg("", operation, vals, valsOffset);
+		}
+		
 		void buildOps(JsonArray *jsonOps, std::vector<unsigned char> *ops, std::vector<double> *vals, unsigned char valsOffset)
 		{
 			for (JsonVariant opVariant : *jsonOps) {
@@ -56,47 +48,47 @@ class CustomEffect : public Effect {
 				
 				if (name.equalsIgnoreCase("getColor")) {
 					ops->push_back(0);
-					ops->push_back(getUnaryReg(&op, vals, valsOffset));
+					ops->push_back(getReg(&op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("colorScaleVid")) {
 					ops->push_back(1);
-					ops->push_back(getUnaryReg(&op, vals, valsOffset));
+					ops->push_back(getReg(&op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("set")) {
 					ops->push_back(2);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getUnaryReg(&op, vals, valsOffset));
+					ops->push_back(getReg(&op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("add")) {
 					ops->push_back(3);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("sub")) {
 					ops->push_back(4);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("mul")) {
 					ops->push_back(5);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 				}  else if (name.equalsIgnoreCase("div")) {
 					ops->push_back(6);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("frac")) {
 					ops->push_back(7);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getUnaryReg(&op, vals, valsOffset));
+					ops->push_back(getReg(&op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("pow")) {
 					ops->push_back(8);
 					ops->push_back(op["dest"].as<unsigned char>());
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 				} else if (name.equalsIgnoreCase("lessOrEqual")) {
 					ops->push_back(9);
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 					
 					unsigned int placeholderIndex = ops->size();
 					ops->push_back(0); // placeholder
@@ -107,8 +99,8 @@ class CustomEffect : public Effect {
 					ops->at(placeholderIndex) = ops->size() - placeholderIndex - 1;
 				} else if (name.equalsIgnoreCase("greater")) {
 					ops->push_back(10);
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 1));
-					ops->push_back(getBinaryReg(&op, vals, valsOffset, 2));
+					ops->push_back(getReg("1", &op, vals, valsOffset));
+					ops->push_back(getReg("2", &op, vals, valsOffset));
 					
 					unsigned int placeholderIndex = ops->size();
 					ops->push_back(0); // placeholder
@@ -251,32 +243,46 @@ class CustomEffect : public Effect {
 			DynamicJsonDocument doc(4 * 1024);
 			deserializeJson(doc, effectJson);
 			
-			int paramVars = doc["paramVars"];
-			int tempVars = doc["tempVars"];
+			_numTemps = doc["tempVars"];
+			_numParams = 0;
+			
+			if (doc.containsKey("paramVars")) {
+				JsonArray paramArr = doc["paramVars"].as<JsonArray>();
+				_numParams = paramArr.size();
+			}
 			
 			std::vector<unsigned char> ops;
 			std::vector<double> vals;
 			
 			JsonArray jsonOps = doc["ops"].as<JsonArray>();
-			buildOps(&jsonOps, &ops, &vals, 2 + paramVars + tempVars);
+			buildOps(&jsonOps, &ops, &vals, 2 + _numParams + _numTemps);
 			
+			_numVals = vals.size();
 			_numOps = ops.size();
 			
 			_ops = new unsigned char[_numOps];
-			_vars = new double[2 + paramVars + tempVars + vals.size()];
+			_vars = new double[2 + _numParams + _numTemps + _numVals];
 			
 			Serial.println("NumOps: " + String(_numOps));
-			Serial.println("NumVals: " + String(vals.size()));
+			Serial.println("NumVals: " + String(_numVals));
 			
-			for (int i = 0; i < ops.size(); i++) {
+			for (int i = 0; i < _numOps; i++) {
 				// Serial.println("#" + String(i) + ": " + String(ops[i]));
 				_ops[i] = ops[i];
 			}
 			
-			_vars[0] = 0.2;
+			if (doc.containsKey("paramVars")) {
+				JsonArray paramArr = doc["paramVars"].as<JsonArray>();
+				int index = 0;
+				
+				for (JsonVariant paramVariant : paramArr) {
+					double val = paramVariant.as<double>();
+					_vars[index++] = val;
+				}
+			}
 			
-			for (int i = 0; i < vals.size(); i++) {
-				_vars[2 + paramVars + tempVars + i] = vals[i];
+			for (int i = 0; i < _numVals; i++) {
+				_vars[2 + _numParams + _numTemps + i] = vals[i];
 			}
 			
 			/*
@@ -301,13 +307,25 @@ class CustomEffect : public Effect {
 			if (_vars) {
 				delete[] _vars;
 				_vars = NULL;
+				
+				_numParams = 0;
+				_numTemps = 0;
+				_numVals = 0;
 			}
+		}
+		
+		double getDuration()
+		{
+			if (_numParams >= 1 && _vars)
+				return _vars[0]; // return the first register as the duration
+			
+			return 0.0;
 		}
 		
 		CRGB update(double timeValue, double posValue)
 		{
-			_vars[1] = timeValue;
-			_vars[2] = posValue;
+			_vars[_numParams] = timeValue;
+			_vars[_numParams + 1] = posValue;
 			
 			handleOps();
 			

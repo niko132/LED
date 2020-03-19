@@ -60,11 +60,23 @@ void setup() {
 }
 
 unsigned long lastAliveMillis = 0;
-unsigned long logMillis = 0;
+
+const int FPS_INTERVAL = 5;
+unsigned long fpsNextMillis = 0;
+unsigned long frameCounter = 0;
 
 void loop() {
-//  Serial.println(String(millis() - logMillis) + "ms");
-  logMillis = millis();
+  // Print FPS
+  /*
+  frameCounter++;
+  if (millis() > fpsNextMillis) {
+	  int fps = (float) frameCounter / FPS_INTERVAL;
+	  Serial.println(String(fps) + "FPS");
+	  
+	  fpsNextMillis = millis() + FPS_INTERVAL * 1000;
+	  frameCounter = 0;
+  }
+  */
 	
 	
   // put your main code here, to run repeatedly:

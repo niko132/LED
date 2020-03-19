@@ -1,0 +1,131 @@
+{
+	"tempVars": 4,
+	"paramVars": [
+		10.0,
+		0.2
+	],
+	"ops": [{
+			"name": "getColor",
+			"reg": 2
+		},
+		{
+			"name": "greater",
+			"reg1": 2,
+			"val2": 0.5,
+			"ops": [{
+				"name": "sub",
+				"dest": 2,
+				"val1": 1.0,
+				"reg2": 2
+			}]
+		},
+		{
+			"name": "sub",
+			"dest": 4,
+			"val1": 1.0,
+			"reg2": 1
+		},
+		{
+			"name": "mul",
+			"dest": 4,
+			"reg1": 4,
+			"reg2": 2
+		},
+		{
+			"name": "mul",
+			"dest": 4,
+			"reg1": 4,
+			"val2": 2.0
+		},
+		{
+			"name": "add",
+			"dest": 4,
+			"reg1": 4,
+			"reg2": 1
+		},
+		{
+			"name": "add",
+			"dest": 4,
+			"reg1": 4,
+			"reg2": 3
+		},
+		{
+			"name": "frac",
+			"dest": 4,
+			"reg": 4
+		},
+		{
+			"name": "set",
+			"dest": 7,
+			"val": 0.0
+		},
+		{
+			"name": "lessOrEqual",
+			"reg1": 4,
+			"reg2": 1,
+			"ops": [{
+					"name": "div",
+					"dest": 5,
+					"reg1": 1,
+					"val2": 5.0
+				},
+				{
+					"name": "mul",
+					"dest": 6,
+					"reg1": 5,
+					"val2": 3.0
+				},
+				{
+					"name": "greater",
+					"reg1": 4,
+					"reg2": 6,
+					"ops": [{
+						"name": "sub",
+						"dest": 4,
+						"reg1": 1,
+						"reg2": 4
+					}]
+				},
+				{
+					"name": "set",
+					"dest": 7,
+					"val": 255.0
+				},
+				{
+					"name": "mul",
+					"dest": 5,
+					"reg1": 5,
+					"val2": 2.0
+				},
+				{
+					"name": "lessOrEqual",
+					"reg1": 4,
+					"reg2": 5,
+					"ops": [{
+							"name": "div",
+							"dest": 7,
+							"reg1": 4,
+							"reg2": 5
+						},
+						{
+							"name": "pow",
+							"dest": 7,
+							"reg1": 7,
+							"val2": 3.0
+						},
+						{
+							"name": "mul",
+							"dest": 7,
+							"reg1": 7,
+							"val2": 255.0
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "colorScaleVid",
+			"reg": 7
+		}
+	]
+}

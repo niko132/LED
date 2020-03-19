@@ -20,6 +20,10 @@ class Effect {
 			return _name;
 		};
 		
+		virtual double getDuration() {
+			return 5.0; // default is 5 seconds
+		}
+		
         virtual CRGB update(double timeValue, double posValue) = 0;
 };
 
