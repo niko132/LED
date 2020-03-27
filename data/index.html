@@ -11,14 +11,17 @@
 		<div>
 			<input type="checkbox" id="on_off" name="on_off">
 			<label for="on_off">On</label><br>
-			<button type="button" id="add_device">Add Device</button>
 		</div>
 		<div id="container">
 		</div>
 	</body>
 	
 	<script>
-loadData();
+// loadData();
+
+var effects = [];
+loadEffects();
+loadOnOff();
 
 $('#on_off').change(function() {
 	var val = $(this).is(':checked');
@@ -32,26 +35,148 @@ $('#on_off').change(function() {
 	});
 });
 
-$('#add_device').click(function() {
-	$.ajax({
-		url: '/add_device/',
-		type: 'POST',
-		data: JSON.stringify({startIndex: 0, endIndex: 180, zIndex: 999}),
-		contentType: 'application/json',
-		success: function(){
-			loadData();
-		}
+function loadOnOff() {
+	$.getJSON("/get_info", function(data) {
+		$('#on_off').prop('checked', data.on);
 	});
-});
+}
+
+function loadEffects() {
+	$.getJSON("/get_effects", function(data) {
+		effects = data;
+		
+		loadData();
+	});
+}
 
 function loadData() {
 	$.getJSON("/get_devices", function(data) {
 		var container = $('#container');
-		
 		container.empty();
+		
+		$.each(data, function(i, item) {
+			item.hue = i / data.length * 360;
+		});
+		
+		var zData = [];
+		var mah = [];
+		
+		/*
+		var index = 0;
+		
+		while(true) {
+			var dataRow = [];
+			var mahRow = [];
+		
+			$.each(data, function(i, item) {
+				if (item.zIndex == index) {
+					dataRow.push(item);
+					mahRow.push({'start': item.startIndex, 'end': item.endIndex, 'hue': item.hue});
+				}
+			});
+			
+			zData.push(dataRow);
+			mah.push(mahRow);
+			index += 1;
+			
+			if (dataRow.length <= 0)
+				break;
+		}
+		*/
+		
+		
+		
+		zData = [];
+		mah = [];
+		
+		$.each(data, function(i, item) {
+			for (var j = zData.length; j <= item.zIndex; j++) {
+				zData.push([]);
+				mah.push([]);
+			}
+			
+			zData[item.zIndex].push(item);
+			mah[item.zIndex].push({'start': item.startIndex, 'end': item.endIndex, 'hue': item.hue});
+		});
+		
+		// add one extra
+		zData.push([]);
+		mah.push([]);
+		
+		
+		
+		$.each(mah.slice().reverse(), function(i, item) {
+			i = mah.length - i - 1;
+		
+			var row = $('<div>');
+			row.css('display', 'flex');
+			row.css('margin-top', '10px');
+			row.css('margin-bottom', '10px');
+			
+			var button = $('<button>', {
+				'type': 'button',
+				'text': 'Add Device',
+				on: {
+					click: function() {
+						var startIdx = 0;
+						var endIdx = 180;
+						
+						if (zData[i].length > 0) {
+							var lastDevice = zData[i][zData[i].length - 1];
+							
+							startIdx = parseInt((lastDevice.startIndex + lastDevice.endIndex) / 2);
+							endIdx = lastDevice.endIndex;
+						}
+					
+						$.ajax({
+							url: '/add_device/',
+							type: 'POST',
+							data: JSON.stringify({startIndex: startIdx, endIndex: endIdx, zIndex: i}),
+							contentType: 'application/json',
+							success: function(){
+								loadData();
+							}
+						});
+					}
+				}
+			});
+			button.css('float', 'left');
+			button.css('width', '15%');
+			button.appendTo(row);
+		
+			if (item.length > 0) {
+				var slider = createMultiSlider(1, 180, item, function(handleIndex, values) {
+					var deviceIndex = parseInt(handleIndex / 2);
+					
+					console.log(values);
+					
+					var val1 = values[deviceIndex * 2] - 1;
+					var val2 = values[deviceIndex * 2 + 1];
+					
+					var device = zData[i][deviceIndex];
+					
+					$.ajax({
+						url: '/edit_device/',
+						type: 'POST',
+						data: JSON.stringify({id: device.id, startIndex: val1, endIndex: val2}),
+						contentType: 'application/json',
+						success: function(){
+						
+						}
+					});
+				});
+				slider.css('float', 'left');
+				slider.css('width', '75%');
+				slider.css('margin-left', '5%');
+				slider.appendTo(row);
+			}
+			
+			row.appendTo(container);
+		});
+		
+		
 	
 		$.each(data, function(i, item) {
-			console.log(item.id);
 			createDeviceBlock(item).appendTo(container);
 		});
 	});
@@ -59,6 +184,10 @@ function loadData() {
 
 function createDeviceBlock(device) {
 	var container = $('<div>');
+	
+	var hslText = 'hsl(' + (device.hue) + ',100%,80%)';
+	container.css('background', hslText);
+	container.css('padding', '1%');
 	
 	var title = $('<h2>', {'text': device.id});
 	
@@ -81,32 +210,6 @@ function createDeviceBlock(device) {
 	});
 	
 	/*
-	var startIndexSlider = createSlider(0, 179, device.startIndex, 'startIndex', function(val) {
-		$.ajax({
-			url: '/edit_device/',
-			type: 'POST',
-			data: JSON.stringify({id: device.id, startIndex: val}),
-			contentType: 'application/json',
-			dataType:'json',
-			success: function(){
-				loadData();
-			}
-		});
-	});
-	var endIndexSlider = createSlider(1, 180, device.endIndex, 'endIndex', function(val) {
-		$.ajax({
-			url: '/edit_device/',
-			type: 'POST',
-			data: JSON.stringify({id: device.id, endIndex: val}),
-			contentType: 'application/json',
-			dataType:'json',
-			success: function(){
-				loadData();
-			}
-		});
-	});
-	*/
-	
 	var rangeSlider = createDoubleSlider(0, 180, device.startIndex, device.endIndex, 6343876, function(val1, val2) {
 		$.ajax({
 			url: '/edit_device/',
@@ -121,16 +224,13 @@ function createDeviceBlock(device) {
 	
 	var ledCount = $('<p>', {'text': device.ledCount});
 	var ledRangeCount = $('<p>', {'text': device.ledRangeCount});
+	*/
 	
 	container.append(title);
 	container.append(deleteButton);
-	/*
-	container.append(startIndexSlider);
-	container.append(endIndexSlider);
-	*/
-	container.append(rangeSlider);
-	container.append(ledCount);
-	container.append(ledRangeCount);
+	// container.append(rangeSlider);
+	// container.append(ledCount);
+	// container.append(ledRangeCount);
 	
 	var posSlider = createDoubleSlider(0, 100, device.posStart * 100, device.posEnd * 100, 6343876, function(val1, val2) {
 		$.ajax({
@@ -146,6 +246,27 @@ function createDeviceBlock(device) {
 	
 	container.append(posSlider);
 	
+	var l = [];
+		
+	$.each(effects, function(i, item) {
+		var row = {};
+		row.value = item.index;
+		row.name = item.name;
+			
+		l.push(row);
+	});
+	
+	var select = createSelectList(l, device.effectIndex, function(val) {
+		$.ajax({
+			url: '/' + device.id + '/set_effect',
+			type: 'POST',
+			data: JSON.stringify({index: val}),
+			contentType: 'application/json'
+		});
+	});
+	container.append(select);
+	
+	/*
 	$.getJSON("/" + device.id + "/get_effects", function(data) {
 		var l = [];
 		
@@ -167,6 +288,7 @@ function createDeviceBlock(device) {
 		});
 		container.append(select);
 	});
+	*/
 	
 	$.getJSON("/get_syncable_devices", function(data) {
 		var l = [];
@@ -194,7 +316,7 @@ function createDeviceBlock(device) {
 			});
 		});
 	
-		var select = createSelectList(l, function(val) {
+		var select = createSelectList(l, 0, function(val) {
 			
 		});
 		
@@ -235,7 +357,7 @@ function createDeviceBlock(device) {
 	return container;
 }
 
-function createSelectList(data, callback) {
+function createSelectList(data, selectedIndex, callback) {
 	var select = $('<select>', {
 		on: {
 			change: function() {
@@ -246,18 +368,109 @@ function createSelectList(data, callback) {
 	
 	$.each(data, function(i, item) {
 		var option = $('<option>', {'value': item.value, 'text': item.name});
+		
+		if (i == selectedIndex) {
+			option.prop('selected', true);
+		}
+		
 		select.append(option);
 	});
 	
 	return select;
 }
 
-function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
+function createMultiSlider(minVal, maxVal, vals, callback) {
 	var container = $('<div>');
 	
-	var output1 = $('<p>', {'text': 'Value: '});
-	var output2 = $('<span>', {'id': idVal + 'Output'});
-	output2.text(val1 + ' - ' + val2);
+	var input = $('<div>');
+	
+	var mah = [];
+	
+	$.each(vals, function(i, item) {
+		mah.push(item.start + 1);
+		mah.push(item.end);
+	});
+	
+	var correctionHandler = function(event, ui) {
+		if (ui.handleIndex > 0 && ui.value <= ui.values[ui.handleIndex - 1]) {
+			event.preventDefault();
+			ui.values[ui.handleIndex] = ui.values[ui.handleIndex - 1] + 1;
+		}
+			
+		if (ui.handleIndex < ui.values.length - 1 && ui.value >= ui.values[ui.handleIndex + 1]) {
+			event.preventDefault();
+			ui.values[ui.handleIndex] = ui.values[ui.handleIndex + 1] - 1;
+		}
+			
+		return ui.values[ui.handleIndex];
+	}
+	
+	input.slider({
+		min: minVal,
+		max: maxVal,
+		values: mah,
+		change: function(event, ui) {
+			var val = correctionHandler(event, ui);
+			callback(ui.handleIndex, ui.values);
+			
+			// remove text after slide completes
+			$(ui.handle).text('');
+		},
+		slide: function(event, ui) {
+			var val = correctionHandler(event, ui);
+			
+			$(ui.handle).text(val);
+			
+			var ranges = input.find('.ui-slider-range');
+			
+			var rangeIndex = parseInt(ui.handleIndex / 2);
+			var range = $(ranges[rangeIndex]);
+			
+			var startVal = 0;
+			var endVal = 0;
+			
+			if (ui.handleIndex % 2 == 0) {  // start handle
+				var startVal = val;
+				var endVal = ui.values[ui.handleIndex + 1];
+			} else {  // end handle
+				var startVal = ui.values[ui.handleIndex - 1];
+				var endVal = val;
+			}
+			
+			var left = startVal / maxVal;
+			var right = endVal / maxVal;
+			var width = right - left;
+				
+			range.css('left', (left * 100) + '%');
+			range.css('width', (width * 100) + '%');
+		}
+	});
+	
+	$.each(vals, function(i, item) {
+		var left = item.start / maxVal;
+		var right = item.end / maxVal;
+		var width = right - left;
+		
+		var hslText = 'hsl(' + (item.hue) + ',100%,80%)';
+	
+		var range = $('<div>');
+		range.addClass('ui-slider-range');
+		range.css('left', (left * 100) + '%');
+		range.css('width', (width * 100) + '%');
+		range.css('background', hslText);
+	
+		input.append(range);
+	});
+	
+	container.append(input);
+	
+	return container;
+}
+
+function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
+	var container = $('<div>');
+	container.css('margin-left', '1%');
+	container.css('margin-right', '1%');
 	
 	var input = $('<div>');
 	
@@ -267,17 +480,14 @@ function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
 		max: maxVal,
 		values: [ val1, val2 ],
 		change: function(event, ui) {
-			callback(ui.values[0], ui.values[1]);
+			$(ui.handle).text('');
 		},
 		slide: function(event, ui) {
-			output2.text(ui.values[0] + ' - ' + ui.values[1]);
+			$(ui.handle).text(val);
 		}
 	});
 	
-	output1.append(output2);
-	
 	container.append(input);
-	container.append(output1);
 	
 	return container;
 }

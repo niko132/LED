@@ -99,14 +99,13 @@ void Palette::precalculate(int maxResolution)
 
 CRGB Palette::getColorAtPosition(double pos) {
 	// TODO: increase resolution -> keep heap in mind!!!
-	unsigned int resolution = 180;
     double brightness = 1.0;
 	
-	unsigned int index = pos * resolution;
+	if (!_resolution) {
+		precalculate(180); // precalculate with default resolution
+	}
 	
-	if (!_precalculated) {
-		precalculate(resolution);
-    }
+	unsigned int index = pos * _resolution;
 	
 	unsigned char *c = &_precalculated[index * 3];
 	

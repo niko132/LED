@@ -41,8 +41,9 @@ class VirtualDevice {
 		AsyncWebServer *_server;
 		AsyncUDP *_udp;
 
-		Palette *_palette;
-        Effect *_effect;
+		Palette *_palette = NULL;
+        Effect *_effect = NULL;
+		unsigned int _effectIndex = 0;
 		double _lastTimeValue = 0;
 		
 		AsyncCallbackJsonWebHandler *_effectHandler = NULL;
@@ -59,7 +60,7 @@ class VirtualDevice {
         void setEndIndex(int endIndex);
         void setMode(int mode);
 		
-		void setEffect(int index);
+		void setEffect(unsigned int index);
 		void setTimeValue(double val);
 		
 		void setPosStart(double posStart);
@@ -73,6 +74,7 @@ class VirtualDevice {
         int getLedCount();
 		int getLedRangeCount();
         int getMode();
+		int getEffectIndex();
 		double getPosStart();
 		double getPosEnd();
         unsigned long getId();

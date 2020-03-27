@@ -6,15 +6,23 @@
 #include <FS.h>
 
 #include "PhysicalDevice.h"
+#include "DebugDevice.h"
 #include "DeviceManager.h"
 
 DeviceManager *deviceManager = NULL;
 
 AsyncWebServer server(80);
 
+/*
 IPAddress ip(192, 168, 178, 113);
 
 IPAddress gateway(192, 168, 178, 1);
+IPAddress subnet(255, 255, 255, 0);
+*/
+
+IPAddress ip(192, 168, 2, 113);
+
+IPAddress gateway(192, 168, 2, 1);
 IPAddress subnet(255, 255, 255, 0);
 
 void setup() {
@@ -27,7 +35,8 @@ void setup() {
 
   // TODO: setup wifi
   WiFi.config(ip, gateway, subnet);
-  WiFi.begin("WGLan", "94384322823429699220");
+  // WiFi.begin("WGLan", "94384322823429699220");
+  WiFi.begin("WLAN-RN22NX", "5152111417820959");
 
   Serial.print("Connecting");
   while (WiFi.status() != WL_CONNECTED)
@@ -48,12 +57,20 @@ void setup() {
     return;
   }
 
-  deviceManager = new DeviceManager(180);
+  // deviceManager = new DeviceManager(180);
+  DebugDevice *dd = new DebugDevice(180);
+  deviceManager = new DeviceManager(dd);
 
   deviceManager->begin(&server);
   
-  server.on("/free_heap", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/free_heap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Free Heap: " + String(ESP.getFreeHeap()));
+  });
+  
+  server.on("/heap_frag", HTTP_GET, [](AsyncWebServerRequest *request) {
+	  float frag = ESP.getHeapFragmentation();
+	  
+	  request->send(200, "text/plain", "Heap Fragmentation: " + String(frag) + "%");
   });
   
   server.begin();

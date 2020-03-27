@@ -42,7 +42,9 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
 
     // default effect
 	
-    _effect = new ColorCycle(_palette);
+	setEffect(0);
+	
+    // _effect = new ColorCycle(_palette);
 	// _effect = new ColorFade();
 	// _effect = new StaticColor();
 	// _effect = new Snake();
@@ -54,26 +56,37 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
 
 VirtualDevice::~VirtualDevice()
 {
+	for (int i = 0; i < _subIndices.size(); i++) {
+		delete[] _subIndices[i];
+	}
+	_subIndices.clear();
+	
 	if (_effect) {
 		delete _effect;
 		_effect = NULL;
 	}
 	
 	if (_palette) {
-		delete _palette;
+		// delete _palette; // _palette is retrieved from PaletteManager -> don't delete it
 		_palette = NULL;
 	}
 	
 	if (_server) {
 		// already deletes the handler instances
-		_server->removeHandler(_effectHandler);
-		_effectHandler = NULL;
+		if (_effectHandler) {
+			_server->removeHandler(_effectHandler);
+			_effectHandler = NULL;
+		}
 		
-		_server->removeHandler(_posHandler);
-		_posHandler = NULL;
+		if (_posHandler) {
+			_server->removeHandler(_posHandler);
+			_posHandler = NULL;
+		}
 		
-		_server->removeHandler(_syncHandler);
-		_syncHandler = NULL;
+		if (_syncHandler) {
+			_server->removeHandler(_syncHandler);
+			_syncHandler = NULL;
+		}
 	}
 }
 
@@ -158,6 +171,10 @@ void VirtualDevice::begin(AsyncWebServer *server)
 		// create the new one
 		_effect = new CustomEffect(_palette, effectJson);
 		
+		// just reset it to the first index 
+		// TODO: maybe make _effectIndex signed to indicate invalid effectIndex
+		_effectIndex = 0;
+		
 		request->send(200, "text/plain", "Ok");
 	}, 5 * 1024);
 	
@@ -210,7 +227,7 @@ void VirtualDevice::setMode(int mode)
     _mode = mode;
 }
 
-void VirtualDevice::setEffect(int index)
+void VirtualDevice::setEffect(unsigned int index)
 {
 	if (_effect) {
 		delete _effect;
@@ -233,6 +250,8 @@ void VirtualDevice::setEffect(int index)
 		default:
 			_effect = new ColorCycle(_palette);
 	}
+	
+	_effectIndex = index;
 }
 
 void VirtualDevice::setTimeValue(double val)
@@ -268,14 +287,16 @@ void VirtualDevice::removeArea(int startIndex, int endIndex)
         } else if (endIndex >= _subIndices[i][1] && startIndex <= _subIndices[i][1] && startIndex > _subIndices[i][0]) {
             _subIndices[i][1] = startIndex;
         } else if (startIndex > _subIndices[i][0] && endIndex < _subIndices[i][1]) {
-            int *a = new int[2] {_subIndices[i][0], startIndex};
-            int *b = new int[2] {endIndex, _subIndices[i][1]};
-
-            _subIndices.erase(_subIndices.begin() + i);
-            _subIndices.insert(_subIndices.begin() + i, a);
-            _subIndices.insert(_subIndices.begin() + 1, b);
+			int end = _subIndices[i][1];
+			_subIndices[i][1] = startIndex;
+			
+            int *b = new int[2] {endIndex, end};
+            _subIndices.insert(_subIndices.begin() + i + 1, b);
         } else if (startIndex <= _subIndices[i][0] && endIndex >= _subIndices[i][1]) {
-            _subIndices.erase(_subIndices.begin() + i);
+            int *tmp = _subIndices[i];
+			_subIndices.erase(_subIndices.begin() + i);
+			
+			delete[] tmp;
         }
     }
 }
@@ -309,6 +330,11 @@ int VirtualDevice::getLedRangeCount()
 int VirtualDevice::getMode()
 {
     return _mode;
+}
+
+int VirtualDevice::getEffectIndex()
+{
+	return _effectIndex;
 }
 
 double VirtualDevice::getPosStart()

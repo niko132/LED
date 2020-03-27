@@ -1,11 +1,21 @@
 #include "DeviceManager.h"
 
+#include "ColorCycle.h"
+#include "ColorFade.h"
+#include "StaticColor.h"
+#include "Snake.h"
+#include "PingPong.h"
+#include "CustomEffect.h"
+
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 
 DeviceManager::DeviceManager(PhysicalDevice *device)
 {
     _device = device;
+	
+	int ledCount = device->getLedCount();
+	addDevice(0, ledCount, 0, 0);
 }
 
 DeviceManager::DeviceManager(int ledCount)
@@ -148,8 +158,46 @@ void DeviceManager::begin(AsyncWebServer *server)
 	server->addHandler(removeHandler);
 	server->addHandler(onOffHandler);
 	
+	server->on("/get_info", HTTP_GET, [this](AsyncWebServerRequest *request){
+		AsyncJsonResponse *response = new AsyncJsonResponse();
+		JsonObject root = response->getRoot().as<JsonObject>();
+		
+		root["on"] = _onState;
+		
+		response->setLength();
+		request->send(response);
+	});
+	
+	server->on("/get_effects", HTTP_GET, [this](AsyncWebServerRequest *request){
+		AsyncJsonResponse *response = new AsyncJsonResponse();
+		JsonArray root = response->getRoot().to<JsonArray>();
+		
+		Effect* effects[] = {
+			new ColorCycle(NULL),
+			new ColorFade(NULL),
+			new StaticColor(NULL),
+			new Snake(NULL),
+			new PingPong(NULL)
+		};
+		
+		// TODO: implement variable effect size
+		for (int i = 0; i < 5; i++) {
+			JsonObject deviceObject = root.createNestedObject();
+			deviceObject["index"] = i;
+			deviceObject["name"] = effects[i]->getName();
+			
+			
+			// TODO: get some better memory management
+			delete effects[i];
+			effects[i] = NULL;
+		}
+		
+		response->setLength();
+		request->send(response);
+	});
+	
 	server->on("/get_devices", HTTP_GET, [this](AsyncWebServerRequest *request){		
-		AsyncJsonResponse *response = new AsyncJsonResponse(4 * 1024, true);
+		AsyncJsonResponse *response = new AsyncJsonResponse(true, 4 * 1024);
 		JsonArray root = response->getRoot().as<JsonArray>();
 		
 		for (int i = 0; i < getDeviceCount(); i++) {
@@ -160,6 +208,7 @@ void DeviceManager::begin(AsyncWebServer *server)
 			deviceObject["ledRangeCount"] = getDeviceAt(i)->getLedRangeCount();
 			deviceObject["zIndex"] = getDeviceZIndex(getDeviceAt(i));
 			deviceObject["mode"] = getDeviceAt(i)->getMode();
+			deviceObject["effectIndex"] = getDeviceAt(i)->getEffectIndex();
 			deviceObject["posStart"] = getDeviceAt(i)->getPosStart();
 			deviceObject["posEnd"] = getDeviceAt(i)->getPosEnd();
 			deviceObject["id"] = getDeviceAt(i)->getId();

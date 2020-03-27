@@ -4,7 +4,7 @@
 #include <NeoPixelBus.h>
 
 class PhysicalDevice {
-    private:
+    protected:
         int _ledCount;
 		bool _mirror;
         NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> _strip;
@@ -19,7 +19,7 @@ class PhysicalDevice {
         unsigned char* getPixelBuf();
         
         void clear();
-        void update();
+        virtual void update();
 };
 
 #endif // PHYSICALDEVICE_H
