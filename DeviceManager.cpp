@@ -1,5 +1,7 @@
 #include "DeviceManager.h"
 
+#include "EffectManager.h"
+
 #include "ColorCycle.h"
 #include "ColorFade.h"
 #include "StaticColor.h"
@@ -173,6 +175,7 @@ void DeviceManager::begin(AsyncWebServer *server)
 		AsyncJsonResponse *response = new AsyncJsonResponse();
 		JsonArray root = response->getRoot().to<JsonArray>();
 		
+		/*
 		Effect* effects[] = {
 			new ColorCycle(NULL),
 			new ColorFade(NULL),
@@ -191,6 +194,15 @@ void DeviceManager::begin(AsyncWebServer *server)
 			// TODO: get some better memory management
 			delete effects[i];
 			effects[i] = NULL;
+		}
+		*/
+		
+		unsigned int effectCount = LEDEffectManager.getEffectCount();
+		
+		for (int i = 0; i < effectCount; i++) {
+			JsonObject deviceObject = root.createNestedObject();
+			deviceObject["index"] = i;
+			deviceObject["name"] = LEDEffectManager.getEffectNameAt(i);
 		}
 		
 		response->setLength();

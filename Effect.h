@@ -8,9 +8,9 @@
 class Effect {
     protected:
 		String _name;
-        Palette *_palette;
+        Palette *_palette = NULL;
 
-    public:
+    public:	
         Effect(String name, Palette *palette) {
 			_name = name;
 			_palette = palette;
@@ -22,7 +22,16 @@ class Effect {
 		
 		virtual double getDuration() {
 			return 5.0; // default is 5 seconds
-		}
+		};
+		
+		void setName(String name)
+		{
+			_name = name;
+		};
+		
+		void setPalette(Palette *palette) {
+			_palette = palette;
+		};
 		
         virtual CRGB update(double timeValue, double posValue) = 0;
 };

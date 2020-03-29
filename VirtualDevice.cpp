@@ -2,6 +2,7 @@
 
 #include "PaletteManager.h"
 #include "SyncManager.h"
+#include "EffectManager.h"
 
 #include "ColorCycle.h"
 #include "ColorFade.h"
@@ -176,9 +177,9 @@ void VirtualDevice::begin(AsyncWebServer *server)
 		// create the new one
 		_effect = new CustomEffect(_palette, effectJson);
 		
-		// just reset it to the first index 
-		// TODO: maybe make _effectIndex signed to indicate invalid effectIndex
-		_effectIndex = -1;
+		_effectIndex = LEDEffectManager.createEffect((CustomEffect*) _effect);
+		Serial.println("New Effect: " + String(_effectIndex));
+		
 		
 		LEDSyncManager.deviceChanged(this);
 		
@@ -244,6 +245,7 @@ void VirtualDevice::setEffect(int index)
 		_effect = NULL;
 	}
 	
+	/*
 	switch(index) {
 		case 1:
 			_effect = new ColorFade(_palette);
@@ -263,6 +265,16 @@ void VirtualDevice::setEffect(int index)
 	
 	_effectIndex = index;
 	LEDSyncManager.deviceChanged(this);
+	*/
+	
+	_effect = LEDEffectManager.getEffectAt(index, _palette);
+	
+	if (_effect) {
+		_effectIndex = index;
+	} else { // load default effect
+		_effect = new ColorFade(_palette);
+		_effectIndex = 0;
+	}
 }
 
 void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)

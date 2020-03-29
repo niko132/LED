@@ -333,12 +333,32 @@ class CustomEffect : public Effect {
 			readOff += _numVals * sizeof(double);
 			
 			Serial.println("Parsing Custom Effect: " + String(length) + " " + String(readOff));
-		}
+		};
+		
+		CustomEffect(Palette *palette, Stream *in, String name) : Effect("CustomEffect", palette), _color(0, 0, 0)
+		{
+			in->readBytes((unsigned char*) &_numOps, sizeof(_numOps));
+			in->readBytes((unsigned char*) &_numParams, sizeof(_numParams));
+			in->readBytes((unsigned char*) &_numTemps, sizeof(_numParams));
+			in->readBytes((unsigned char*) &_numVals, sizeof(_numVals));
+			
+			_ops = new unsigned char[_numOps];
+			_vars = new double[2 + _numParams + _numTemps + _numVals];
+			
+			in->readBytes((unsigned char*) _ops, _numOps * sizeof(unsigned char));
+			in->readBytes((unsigned char*) _vars, _numParams * sizeof(double));
+			in->readBytes((unsigned char*) &_vars[2 + _numParams + _numTemps], _numVals * sizeof(double));
+		
+			setName(name);
+		};
 	
 		CustomEffect(Palette *palette, String effectJson) : Effect("CustomEffect", palette), _color(0, 0, 0)
 		{
 			DynamicJsonDocument doc(4 * 1024);
 			deserializeJson(doc, effectJson);
+			
+			String name = doc["name"];
+			setName(name);
 			
 			_numTemps = doc["tempVars"];
 			_numParams = 0;
@@ -460,6 +480,17 @@ class CustomEffect : public Effect {
 			*length = writeOff;
 			
 			return buf;
+		}
+		
+		void serialize(Stream *out)
+		{
+			out->write((unsigned char*) &_numOps, sizeof(_numOps));
+			out->write((unsigned char*) &_numParams, sizeof(_numParams));
+			out->write((unsigned char*) &_numTemps, sizeof(_numTemps));
+			out->write((unsigned char*) &_numVals, sizeof(_numVals));
+			out->write((unsigned char*) _ops, _numOps * sizeof(unsigned char));
+			out->write((unsigned char*) _vars, _numParams * sizeof(double));
+			out->write((unsigned char*) &_vars[2 + _numParams + _numTemps], _numVals * sizeof(double));
 		}
 };
 
