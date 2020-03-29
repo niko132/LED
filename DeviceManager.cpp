@@ -10,21 +10,22 @@
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 
-DeviceManager::DeviceManager(PhysicalDevice *device)
+void DeviceManager::begin(PhysicalDevice *device, AsyncWebServer *server)
 {
     _device = device;
 	
 	int ledCount = device->getLedCount();
 	addDevice(0, ledCount, 0, 0);
+	
+	begin(server);
 }
 
-DeviceManager::DeviceManager(int ledCount)
+void DeviceManager::begin(int ledCount, AsyncWebServer *server)
 {
-    Serial.println("DeviceManager Constructor: " + String(ledCount));
-
     _device = new PhysicalDevice(ledCount);
-
 	addDevice(0, ledCount, 0, 0);
+	
+	begin(server);
 }
 
 DeviceManager::~DeviceManager()
@@ -218,158 +219,9 @@ void DeviceManager::begin(AsyncWebServer *server)
 		request->send(response);
 	});
 	
-	server->on("/get_syncable_devices", HTTP_GET, [this](AsyncWebServerRequest *request){		
-		AsyncJsonResponse *response = new AsyncJsonResponse();
-		JsonObject root = response->getRoot().to<JsonObject>();
-		
-		for (std::map<String, std::vector<unsigned long>>::iterator it = _syncableDevices.begin(); it != _syncableDevices.end(); it++) {
-			JsonArray idArray = root.createNestedArray(it->first);
-			
-			for (int i = 0; i < it->second.size(); i++) {
-				idArray.add(it->second[i]);
-			}
-		}
-		
-		response->setLength();
-		request->send(response);
-	});
-	
 	server->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
 		request->send(SPIFFS, "/index.html", String());
 	});
-	
-	if (_udp.listen(6789)) {
-		Serial.print("UDP Listening on IP: ");
-        Serial.println(WiFi.localIP());
-		
-        _udp.onPacket([this](AsyncUDPPacket packet) {
-			/*
-            Serial.print("UDP Packet Type: ");
-            Serial.print(packet.isBroadcast()?"Broadcast":packet.isMulticast()?"Multicast":"Unicast");
-            Serial.print(", From: ");
-            Serial.print(packet.remoteIP());
-            Serial.print(":");
-            Serial.print(packet.remotePort());
-            Serial.print(", To: ");
-            Serial.print(packet.localIP());
-            Serial.print(":");
-            Serial.print(packet.localPort());
-            Serial.print(", Length: ");
-            Serial.print(packet.length());
-            Serial.print(", Data: ");
-            Serial.write(packet.data(), packet.length());
-            Serial.println();
-			*/
-            // reply to the client
-            // packet.printf("Got %u bytes of data", packet.length());
-			
-			if (packet.data()[0] == 0) { // device search request
-				unsigned int deviceCount = getDeviceCount();
-			
-				// 1 op-byte + 1 * ul count + count * ul
-				unsigned char *buf = new unsigned char[1 + sizeof(unsigned int) + deviceCount * sizeof(unsigned long)];
-				unsigned int index = 0;
-				
-				buf[index] = 1;
-				index += 1;
-				
-				memcpy(&buf[index], &deviceCount, sizeof(deviceCount));
-				index += sizeof(deviceCount);
-				
-				for (int i = 0; i < deviceCount; i++) {
-					VirtualDevice *device = getDeviceAt(i);
-					unsigned long id = device->getId();
-					
-					memcpy(&buf[index], &id, sizeof(id));
-					index += sizeof(id);
-				}
-				
-				packet.write(buf, index);
-				
-				delete[] buf;
-			} else if (packet.data()[0] == 1 && packet.length() >= 5) { // device search reply
-				unsigned int index = 1;
-				
-				unsigned int deviceCount;
-				memcpy(&deviceCount, &packet.data()[index], sizeof(deviceCount));
-				index += sizeof(deviceCount);
-				
-				std::vector<unsigned long> ids;
-				
-				for (int i = 0; i < deviceCount; i++) {
-					unsigned long id;
-					memcpy(&id, &packet.data()[index], sizeof(unsigned long));
-					index += sizeof(id);
-					
-					ids.push_back(id);
-				}
-				
-				if (!ids.empty()) {
-					_syncableDevices[packet.remoteIP().toString()] = ids;
-				}
-				
-			} else if (packet.length() >= 5) { // let the device handle this message
-				unsigned long id;
-				memcpy(&id, &packet.data()[1], sizeof(id));
-				
-				VirtualDevice *device = getDevice(id);
-				
-				if (device) {
-					device->receivedUdpMessage(&packet);
-				}
-			}
-				
-			/*
-			} else if (packet.data()[0] == 11) {
-				int index = 1;
-				
-				unsigned long id;
-				memcpy(&id, &packet.data()[index], sizeof(id));
-				index += sizeof(id);
-				
-				double val;
-				memcpy(&val, &packet.data()[index], sizeof(val));
-				index += sizeof(val);
-				
-				
-				unsigned char buf[50];
-				int cnt = 0;
-		
-				buf[cnt] = 12;
-				cnt += 1;
-		
-				memcpy(&buf[cnt], &id, sizeof(id));
-				cnt += sizeof(id);
-		
-				memcpy(&buf[cnt], &val, sizeof(val));
-				cnt += sizeof(val);
-				
-				
-				packet.write(buf, cnt);
-				
-				VirtualDevice* device = getDevice(id);
-				if (device) {
-					device->setPosStart(0.5);
-					device->setPosEnd(1.0);
-					
-					device->setTimeValue(val);
-				}
-			} else if (packet.data()[0] == 12) {
-				int index = 1;
-				
-				unsigned long id;
-				memcpy(&id, &packet.data()[index], sizeof(id));
-				index += sizeof(id);
-				
-				double val;
-				memcpy(&val, &packet.data()[index], sizeof(val));
-				index += sizeof(val);
-				
-				Serial.println("Got UDP Data: " + String(id) + " " + String(val));
-			}
-			*/
-        });
-	}
 }
 
 VirtualDevice* DeviceManager::getDevice(unsigned long id)
@@ -425,7 +277,7 @@ unsigned long DeviceManager::addDevice(int startIndex, int endIndex, int zIndex,
 {
     Serial.println("Adding Device1: " + String(startIndex) + " " + String(endIndex));
 
-    VirtualDevice *newDevice = new VirtualDevice(_device, startIndex, endIndex, mode, &_udp);
+    VirtualDevice *newDevice = new VirtualDevice(_device, startIndex, endIndex, mode);
 	
 	if (_server)
 		newDevice->begin(_server);
@@ -575,19 +427,6 @@ void DeviceManager::buildDevices() {
     }
 }
 
-void DeviceManager::searchRemoteDevices()
-{
-	_syncableDevices.clear();
-	
-	unsigned char buf;
-	
-	// TODO: use consistent protocol
-	buf = 0;
-	
-	// send one byte
-	_udp.broadcastTo(&buf, 1, 6789);
-}
-
 void DeviceManager::update()
 {
 	unsigned long currentMillis = millis();
@@ -607,10 +446,6 @@ void DeviceManager::update()
 		
 		_lastUpdateMillis = currentMillis;
 	}
-	
-	if (currentMillis - _lastDeviceSearchMillis > 5000.0) { // search every 5 seconds
-		searchRemoteDevices();
-		
-		_lastDeviceSearchMillis = currentMillis;
-	}
 }
+
+DeviceManager LEDDeviceManager;

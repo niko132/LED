@@ -7,9 +7,9 @@
 
 #include "PhysicalDevice.h"
 #include "DebugDevice.h"
-#include "DeviceManager.h"
 
-DeviceManager *deviceManager = NULL;
+#include "DeviceManager.h"
+#include "SyncManager.h"
 
 AsyncWebServer server(80);
 
@@ -59,9 +59,8 @@ void setup() {
 
   // deviceManager = new DeviceManager(180);
   DebugDevice *dd = new DebugDevice(180);
-  deviceManager = new DeviceManager(dd);
-
-  deviceManager->begin(&server);
+  LEDDeviceManager.begin(dd, &server);
+  LEDSyncManager.begin(&server);
   
   server.on("/free_heap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Free Heap: " + String(ESP.getFreeHeap()));
@@ -102,7 +101,8 @@ void loop() {
   // TODO: implement heap check
   // Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
 
-  deviceManager->update();
+  LEDDeviceManager.update();
+  LEDSyncManager.update();
   
   if (millis() - lastAliveMillis > 5 * 1000) {
 	  Serial.println("Alive");

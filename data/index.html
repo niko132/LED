@@ -481,9 +481,10 @@ function createDoubleSlider(minVal, maxVal, val1, val2, idVal, callback) {
 		values: [ val1, val2 ],
 		change: function(event, ui) {
 			$(ui.handle).text('');
+			callback(ui.values[0], ui.values[1]);
 		},
 		slide: function(event, ui) {
-			$(ui.handle).text(val);
+			$(ui.handle).text(ui.value);
 		}
 	});
 	

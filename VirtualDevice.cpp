@@ -1,6 +1,7 @@
 #include "VirtualDevice.h"
 
 #include "PaletteManager.h"
+#include "SyncManager.h"
 
 #include "ColorCycle.h"
 #include "ColorFade.h"
@@ -13,7 +14,7 @@
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 
-VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode, AsyncUDP *udp)
+VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode)
 {
     _device = device;
     _startIndex = startIndex;
@@ -50,8 +51,6 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
 	// _effect = new Snake();
 
     resetAreas();
-	
-	_udp = udp;
 }
 
 VirtualDevice::~VirtualDevice()
@@ -151,6 +150,12 @@ void VirtualDevice::begin(AsyncWebServer *server)
 			ipAddress.fromString(ip);
 		
 			_syncRequests.push_back({ipAddress, id});
+			
+			
+			// TODO: new sync method
+			LEDSyncManager.startSync(this, ipAddress, id);
+			
+			
 		
 			request->send(200, "text/plain", "Start sync: " + ip + " - " + String(id));
 		} else {
@@ -173,7 +178,9 @@ void VirtualDevice::begin(AsyncWebServer *server)
 		
 		// just reset it to the first index 
 		// TODO: maybe make _effectIndex signed to indicate invalid effectIndex
-		_effectIndex = 0;
+		_effectIndex = -1;
+		
+		LEDSyncManager.deviceChanged(this);
 		
 		request->send(200, "text/plain", "Ok");
 	}, 5 * 1024);
@@ -215,19 +222,22 @@ void VirtualDevice::begin(AsyncWebServer *server)
 void VirtualDevice::setStartIndex(int startIndex)
 {
     _startIndex = startIndex;
+	LEDSyncManager.deviceChanged(this);
 }
 
 void VirtualDevice::setEndIndex(int endIndex)
 {
     _endIndex = endIndex;
+	LEDSyncManager.deviceChanged(this);
 }
 
 void VirtualDevice::setMode(int mode)
 {
     _mode = mode;
+	LEDSyncManager.deviceChanged(this);
 }
 
-void VirtualDevice::setEffect(unsigned int index)
+void VirtualDevice::setEffect(int index)
 {
 	if (_effect) {
 		delete _effect;
@@ -252,6 +262,19 @@ void VirtualDevice::setEffect(unsigned int index)
 	}
 	
 	_effectIndex = index;
+	LEDSyncManager.deviceChanged(this);
+}
+
+void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)
+{
+	if (_effect) {
+		delete _effect;
+		_effect = NULL;
+	}
+	
+	_effect = new CustomEffect(_palette, buf, length);
+	
+	_effectIndex = -1;
 }
 
 void VirtualDevice::setTimeValue(double val)
@@ -311,6 +334,14 @@ int VirtualDevice::getEndIndex()
     return _endIndex;
 }
 
+int VirtualDevice::getCount()
+{
+	if (_mode == 0)
+		return getLedRangeCount();
+	
+	return getLedCount();
+}
+
 int VirtualDevice::getLedCount()
 {
     int sum = 0;
@@ -352,6 +383,16 @@ unsigned long VirtualDevice::getId()
     return _id;
 }
 
+double VirtualDevice::getLastTimeValue()
+{
+	return _lastTimeValue;
+}
+
+Effect* VirtualDevice::getEffect()
+{
+	return _effect;
+}
+
 void VirtualDevice::update(unsigned long delta)
 {
 	unsigned long duration = (unsigned long) (_effect->getDuration() * 1000.0);
@@ -387,183 +428,4 @@ void VirtualDevice::update(unsigned long delta)
 	}
 		
 	_lastTimeValue = timeValue;
-	
-	handleSyncRequests();
-}
-
-void VirtualDevice::handleSyncRequests()
-{
-	/*
-	while(!_syncRequests.empty()) {
-		SyncRequest request = _syncRequests[0];
-		
-		Serial.println("Handling " + request.ip.toString() + " " + String(request.id));
-		
-		unsigned char buf[50];
-		int cnt = 0;
-		
-		buf[cnt] = 11;
-		cnt += 1;
-		
-		memcpy(&buf[cnt], &request.id, sizeof(request.id));
-		cnt += sizeof(request.id);
-		
-		memcpy(&buf[cnt], &_lastTimeValue, sizeof(_lastTimeValue));
-		cnt += sizeof(_lastTimeValue);
-		
-		_udp->writeTo(buf, cnt, request.ip, 6789);
-
-		// TODO: auto update start and end position
-		setPosStart(0.0);
-		setPosEnd(0.5);
-		
-		_syncRequests.erase(_syncRequests.begin());
-	}
-	*/
-	
-	while(!_syncRequests.empty()) {
-		SyncRequest request = _syncRequests[0];
-		Serial.println("Handling " + request.ip.toString() + " " + String(request.id));
-		
-		unsigned char *buf = new unsigned char[1 + 2 * sizeof(unsigned long)];
-		unsigned int index = 0;
-		
-		buf[index] = 11; // request led count
-		index += 1;
-		
-		memcpy(&buf[index], &request.id, sizeof(request.id));
-		index += sizeof(request.id);
-		
-		memcpy(&buf[index], &_id, sizeof(_id));
-		index += sizeof(_id);
-		
-		_udp->writeTo(buf, index, request.ip, 6789);
-		
-		delete[] buf;
-		
-		_syncRequests.erase(_syncRequests.begin());
-	}
-}
-
-void VirtualDevice::receivedUdpMessage(AsyncUDPPacket *packet)
-{
-	unsigned char *data = packet->data();
-	
-	unsigned int index = 1 + sizeof(unsigned long); // skip op code and own id
-	
-	if (data[0] == 11) { // led count request
-		unsigned long id;
-		memcpy(&id, &data[index], sizeof(id));
-		index += sizeof(id);
-		
-		
-		unsigned char *buf = new unsigned char[1 + 2 * sizeof(unsigned long) + sizeof(int)];
-		unsigned int index = 0;
-		
-		buf[index] = 12; // response led count
-		index += 1;
-		
-		memcpy(&buf[index], &id, sizeof(id));
-		index += sizeof(id);
-		
-		memcpy(&buf[index], &_id, sizeof(_id));
-		index += sizeof(_id);
-		
-		int count;
-		
-		if (_mode == 0)
-			count = getLedRangeCount();
-		else
-			count = getLedCount();
-		
-		memcpy(&buf[index], &count, sizeof(count));
-		index += sizeof(count);
-		
-		packet->write(buf, index);
-		
-		delete[] buf;
-	} else if (data[0] == 12) { // led count response
-		unsigned long id;
-		memcpy(&id, &data[index], sizeof(id));
-		index += sizeof(id);
-	
-		int syncCount;
-		memcpy(&syncCount, &data[index], sizeof(syncCount));
-		index += sizeof(syncCount);
-		
-		
-		SyncedDevice syncedDev = {packet->remoteIP(), id, syncCount};
-		_syncedDevices.push_back(syncedDev);
-		
-		
-		int ownCount;
-		if (_mode == 0)
-			ownCount = getLedRangeCount();
-		else
-			ownCount = getLedCount();
-		
-		int totalCount = ownCount;
-		for (int i = 0; i < _syncedDevices.size(); i++) {
-			SyncedDevice syncedDev = _syncedDevices[i];
-			totalCount += syncedDev.ledCount;
-		}
-		
-		int endCount = ownCount;
-		
-		double posStart = 0.0;
-		double posEnd = (double) endCount / totalCount;
-		
-		setPosStart(posStart);
-		setPosEnd(posEnd);
-		
-		unsigned char *buf = new unsigned char[1 + sizeof(unsigned long) + 3 * sizeof(double)];
-		
-		for (int i = 0; i < _syncedDevices.size(); i++) {
-			SyncedDevice syncedDev = _syncedDevices[i];
-			
-			posStart = posEnd;
-			
-			endCount += syncedDev.ledCount;
-			posEnd = (double) endCount / totalCount;
-			
-			
-			unsigned int index = 0;
-		
-			buf[index] = 13; // response sync config
-			index += 1;
-		
-			memcpy(&buf[index], &syncedDev.id, sizeof(syncedDev.id));
-			index += sizeof(syncedDev.id);
-		
-			memcpy(&buf[index], &posStart, sizeof(posStart));
-			index += sizeof(posStart);
-		
-			memcpy(&buf[index], &posEnd, sizeof(posEnd));
-			index += sizeof(posEnd);
-		
-			memcpy(&buf[index], &_lastTimeValue, sizeof(_lastTimeValue));
-			index += sizeof(_lastTimeValue);
-		
-			_udp->writeTo(buf, index, syncedDev.ip, 6789);
-		}
-		
-		delete[] buf;
-	} else if (data[0] == 13) {
-		double posStart;
-		memcpy(&posStart, &data[index], sizeof(posStart));
-		index += sizeof(posStart);
-		
-		double posEnd;
-		memcpy(&posEnd, &data[index], sizeof(posEnd));
-		index += sizeof(posEnd);
-		
-		double timeVal;
-		memcpy(&timeVal, &data[index], sizeof(timeVal));
-		index += sizeof(timeVal);
-		
-		
-		setPosStart(posStart);
-		setPosEnd(posEnd);
-		setTimeValue(timeVal);
-	}
 }

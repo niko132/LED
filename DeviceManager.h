@@ -7,7 +7,6 @@
 #include <vector>
 #include <map>
 #include <ESPAsyncWebServer.h>
-#include <ESPAsyncUDP.h>
 
 class DeviceManager {
     private:
@@ -16,20 +15,16 @@ class DeviceManager {
 
         std::vector<std::vector<VirtualDevice*>*> _deviceHierarchy;
 		
-		std::map<String, std::vector<unsigned long>> _syncableDevices;
-		
 		unsigned long _lastUpdateMillis = 0;
-		unsigned long _lastDeviceSearchMillis = 0;
 		bool _onState = true;
 		
-		AsyncUDP _udp;
+		void begin(AsyncWebServer *server);
 
     public:
-        DeviceManager(PhysicalDevice *device);
-        DeviceManager(int ledCount);
         ~DeviceManager();
 
-        void begin(AsyncWebServer *server);
+        void begin(PhysicalDevice *device, AsyncWebServer *server);
+        void begin(int ledCount, AsyncWebServer *server);
 		
 		VirtualDevice* getDevice(unsigned long id);
 		VirtualDevice* getDeviceAt(int index);
@@ -45,9 +40,9 @@ class DeviceManager {
 
         void buildDevices();
 		
-		void searchRemoteDevices();
-
         void update();
 };
+
+extern DeviceManager LEDDeviceManager;
 
 #endif // DEVICEMANAGER_H

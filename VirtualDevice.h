@@ -7,7 +7,6 @@
 
 #include <vector>
 #include <ESPAsyncWebServer.h>
-#include <ESPAsyncUDP.h>
 #include <AsyncJson.h>
 
 class VirtualDevice {
@@ -39,11 +38,10 @@ class VirtualDevice {
 		std::vector<SyncRequest> _syncRequests;
 		std::vector<SyncedDevice> _syncedDevices;
 		AsyncWebServer *_server;
-		AsyncUDP *_udp;
 
 		Palette *_palette = NULL;
         Effect *_effect = NULL;
-		unsigned int _effectIndex = 0;
+		int _effectIndex = 0;
 		double _lastTimeValue = 0;
 		
 		AsyncCallbackJsonWebHandler *_effectHandler = NULL;
@@ -51,7 +49,7 @@ class VirtualDevice {
 		AsyncCallbackJsonWebHandler *_syncHandler = NULL;
 
     public:
-        VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode, AsyncUDP *udp);
+        VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode);
 		~VirtualDevice();
 
         void begin(AsyncWebServer *server);
@@ -60,7 +58,8 @@ class VirtualDevice {
         void setEndIndex(int endIndex);
         void setMode(int mode);
 		
-		void setEffect(unsigned int index);
+		void setEffect(int index);
+		void setEffect(unsigned char *buf, unsigned int length);
 		void setTimeValue(double val);
 		
 		void setPosStart(double posStart);
@@ -71,6 +70,7 @@ class VirtualDevice {
 
         int getStartIndex();
         int getEndIndex();
+		int getCount();
         int getLedCount();
 		int getLedRangeCount();
         int getMode();
@@ -78,11 +78,11 @@ class VirtualDevice {
 		double getPosStart();
 		double getPosEnd();
         unsigned long getId();
+		
+		double getLastTimeValue();
+		Effect *getEffect();
 
         void update(unsigned long delta);
-		void handleSyncRequests();
-		
-		void receivedUdpMessage(AsyncUDPPacket *packet);
 };
 
 #endif // VIRTUALDEVICE_H

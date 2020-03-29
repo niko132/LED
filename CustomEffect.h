@@ -18,7 +18,7 @@ class CustomEffect : public Effect {
 		unsigned char *_ops;
 		double *_vars = NULL;
 		
-		unsigned char getReg(String num, JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
+		static unsigned char getReg(String num, JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
 		{
 			JsonObject op = *operation;
 			unsigned char reg = 0;
@@ -34,12 +34,12 @@ class CustomEffect : public Effect {
 			return reg;
 		}
 		
-		unsigned char getReg(JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
+		static unsigned char getReg(JsonObject *operation, std::vector<double> *vals, unsigned char valsOffset)
 		{
 			return getReg("", operation, vals, valsOffset);
 		}
 		
-		void buildOps(JsonArray *jsonOps, std::vector<unsigned char> *ops, std::vector<double> *vals, unsigned char valsOffset)
+		static void buildOps(JsonArray *jsonOps, std::vector<unsigned char> *ops, std::vector<double> *vals, unsigned char valsOffset)
 		{
 			for (JsonVariant opVariant : *jsonOps) {
 				JsonObject op = opVariant.as<JsonObject>();
@@ -238,6 +238,103 @@ class CustomEffect : public Effect {
 		}
 		
 	public:
+		static unsigned char* fromJson(String effectJson, unsigned int *length)
+		{
+			DynamicJsonDocument doc(4 * 1024);
+			deserializeJson(doc, effectJson);
+			
+			unsigned int numTemps = doc["tempVars"];
+			unsigned int numParams = 0;
+			
+			if (doc.containsKey("paramVars")) {
+				JsonArray paramArr = doc["paramVars"].as<JsonArray>();
+				numParams = paramArr.size();
+			}
+			
+			std::vector<unsigned char> ops;
+			std::vector<double> vals;
+			
+			JsonArray jsonOps = doc["ops"].as<JsonArray>();
+			buildOps(&jsonOps, &ops, &vals, 2 + numParams + numTemps);
+			
+			unsigned int numVals = vals.size();
+			unsigned int numOps = ops.size();
+			
+			unsigned char *buf = new unsigned char[4 * sizeof(unsigned int) + numOps + (numParams + numVals) * sizeof(double)];
+			unsigned int writeOff = 0;
+			
+			memcpy(&buf[writeOff], &numOps, sizeof(numOps));
+			writeOff += sizeof(numOps);
+			
+			memcpy(&buf[writeOff], &numParams, sizeof(numParams));
+			writeOff += sizeof(numParams);
+			
+			memcpy(&buf[writeOff], &numTemps, sizeof(numTemps));
+			writeOff += sizeof(numTemps);
+			
+			memcpy(&buf[writeOff], &numVals, sizeof(numVals));
+			writeOff += sizeof(numVals);
+			
+			for (int i = 0; i < numOps; i++) {
+				buf[writeOff++] = ops[i];
+			}
+			
+			if (doc.containsKey("paramVars")) {
+				JsonArray paramArr = doc["paramVars"].as<JsonArray>();
+				int index = 0;
+				
+				for (JsonVariant paramVariant : paramArr) {
+					double val = paramVariant.as<double>();
+					memcpy(&buf[writeOff], &val, sizeof(val));
+					writeOff += sizeof(val);
+				}
+			}
+			
+			for (int i = 0; i < numVals; i++) {
+				double val = vals[i];
+				memcpy(&buf[writeOff], &val, sizeof(val));
+				writeOff += sizeof(val);
+			}
+			
+			*length = writeOff;
+			
+			return buf;
+		};
+		
+		CustomEffect(Palette *palette, unsigned char *data, unsigned int length) : Effect("CustomEffect", palette), _color(0, 0, 0)
+		{
+			unsigned int readOff = 0;
+			
+			memcpy(&_numOps, &data[readOff], sizeof(_numOps));
+			readOff += sizeof(_numOps);
+			
+			memcpy(&_numParams, &data[readOff], sizeof(_numParams));
+			readOff += sizeof(_numParams);
+			
+			memcpy(&_numTemps, &data[readOff], sizeof(_numTemps));
+			readOff += sizeof(_numTemps);
+			
+			memcpy(&_numVals, &data[readOff], sizeof(_numVals));
+			readOff += sizeof(_numVals);
+			
+			
+			Serial.println("Deserialize: " + String(_numOps) + " " + String(_numParams) + " " + String(_numTemps) + " " + String(_numVals));
+			
+			_ops = new unsigned char[_numOps];
+			_vars = new double[2 + _numParams + _numTemps + _numVals];
+			
+			memcpy(_ops, &data[readOff], _numOps);
+			readOff += _numOps;
+			
+			memcpy(_vars, &data[readOff], _numParams * sizeof(double));
+			readOff += _numParams * sizeof(double);
+			
+			memcpy(&_vars[2 + _numParams + _numTemps], &data[readOff], _numVals * sizeof(double));
+			readOff += _numVals * sizeof(double);
+			
+			Serial.println("Parsing Custom Effect: " + String(length) + " " + String(readOff));
+		}
+	
 		CustomEffect(Palette *palette, String effectJson) : Effect("CustomEffect", palette), _color(0, 0, 0)
 		{
 			DynamicJsonDocument doc(4 * 1024);
@@ -331,6 +428,39 @@ class CustomEffect : public Effect {
 			
 			return _color;
 		};
+		
+		unsigned char* serialize(unsigned int *length)
+		{
+			unsigned char *buf = new unsigned char[4 * sizeof(unsigned int) + _numOps + (_numParams + _numVals) * sizeof(double)];
+			unsigned int writeOff = 0;
+			
+			memcpy(&buf[writeOff], &_numOps, sizeof(_numOps));
+			writeOff += sizeof(_numOps);
+			
+			memcpy(&buf[writeOff], &_numParams, sizeof(_numParams));
+			writeOff += sizeof(_numParams);
+			
+			memcpy(&buf[writeOff], &_numTemps, sizeof(_numTemps));
+			writeOff += sizeof(_numTemps);
+			
+			memcpy(&buf[writeOff], &_numVals, sizeof(_numVals));
+			writeOff += sizeof(_numVals);
+			
+			Serial.println("Serialize: " + String(_numOps) + " " + String(_numParams) + " " + String(_numTemps) + " " + String(_numVals));
+			
+			memcpy(&buf[writeOff], _ops, _numOps);
+			writeOff += _numOps;
+			
+			memcpy(&buf[writeOff], _vars, _numParams * sizeof(double));
+			writeOff += _numParams * sizeof(double);
+			
+			memcpy(&buf[writeOff], &_vars[2 + _numParams + _numTemps], _numVals * sizeof(double));
+			writeOff += _numVals * sizeof(double);
+			
+			*length = writeOff;
+			
+			return buf;
+		}
 };
 
 #endif // CUSTOMEFFECT_H
