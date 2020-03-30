@@ -5,17 +5,17 @@
 
 class PhysicalDevice {
     protected:
-        int _ledCount;
+        unsigned int _ledCount;
 		bool _mirror;
         NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> _strip;
         unsigned char* _pixelBuf;
 
     public:
-        PhysicalDevice(int ledCount);
+        PhysicalDevice(unsigned int ledCount);
         ~PhysicalDevice();
 
         void begin();
-        int getLedCount();
+        unsigned int getLedCount();
         unsigned char* getPixelBuf();
         
         void clear();

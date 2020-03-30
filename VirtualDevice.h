@@ -10,20 +10,7 @@
 #include <AsyncJson.h>
 
 class VirtualDevice {
-    private:
-		typedef struct
-		{
-			IPAddress ip;
-			unsigned long id;
-		} SyncRequest;
-		
-		typedef struct
-		{
-			IPAddress ip;
-			unsigned long id;
-			int ledCount;
-		} SyncedDevice;
-	
+    private:	
         PhysicalDevice *_device;
         int _startIndex;
         int _endIndex;
@@ -35,8 +22,6 @@ class VirtualDevice {
 
         std::vector<int*> _subIndices;
 		
-		std::vector<SyncRequest> _syncRequests;
-		std::vector<SyncedDevice> _syncedDevices;
 		AsyncWebServer *_server;
 
 		Palette *_palette = NULL;
@@ -50,6 +35,7 @@ class VirtualDevice {
 
     public:
         VirtualDevice(PhysicalDevice *device, int startIndex, int endIndex, int mode);
+		VirtualDevice(PhysicalDevice *device, unsigned long id);
 		~VirtualDevice();
 
         void begin(AsyncWebServer *server);
@@ -81,6 +67,8 @@ class VirtualDevice {
 		
 		double getLastTimeValue();
 		Effect *getEffect();
+		
+		void serialize();
 
         void update(unsigned long delta);
 };

@@ -11,21 +11,30 @@
 
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
+#include <FS.h>
 
-void DeviceManager::begin(PhysicalDevice *device, AsyncWebServer *server)
+void DeviceManager::begin(DebugDevice *device, AsyncWebServer *server)
 {
-    _device = device;
+	_device = device;
 	
-	int ledCount = device->getLedCount();
-	addDevice(0, ledCount, 0, 0);
+	bool success = loadConfig(device->getLedCount());
+	
+	if (!success) {
+		int ledCount = device->getLedCount();
+		addDevice(0, ledCount, 0, 0);
+	}
 	
 	begin(server);
 }
 
-void DeviceManager::begin(int ledCount, AsyncWebServer *server)
+void DeviceManager::begin(unsigned int ledCount, AsyncWebServer *server)
 {
-    _device = new PhysicalDevice(ledCount);
-	addDevice(0, ledCount, 0, 0);
+	loadConfig(ledCount);
+	
+	if (!_device) { // couldnt load proper config
+		_device = new PhysicalDevice(ledCount);
+		addDevice(0, ledCount, 0, 0);
+	}
 	
 	begin(server);
 }
@@ -74,6 +83,11 @@ void DeviceManager::begin(AsyncWebServer *server)
 			Serial.println("Add: " + String(startIndex) + " " + String(endIndex) + " " + String(zIndex) + " " + String(mode));
 	
 			unsigned long id = addDevice(startIndex, endIndex, zIndex, mode);
+			
+			
+			saveConfig();
+			
+			
 			request->send(200, "text/plain", String(id));
 		} else {
 			request->send(400, "text/plain", "startIndex, endIndex needed");
@@ -111,6 +125,8 @@ void DeviceManager::begin(AsyncWebServer *server)
 			Serial.println("Edit: " + String(id) + " " + String(startIndex) + " " + String(endIndex) + " " + String(zIndex) + " " + String(mode));
 	
 			editDevice(id, startIndex, endIndex, zIndex, mode);
+			
+			
 			request->send(200, "text/plain", String(id));
 		} else {
 			request->send(400, "text/plain", "id needed");
@@ -133,6 +149,10 @@ void DeviceManager::begin(AsyncWebServer *server)
 				device = NULL;
 			}
 			
+			
+			saveConfig();
+			
+			
 			request->send(200);
 		} else {
 			request->send(400, "text/plain", "id needed");
@@ -150,6 +170,11 @@ void DeviceManager::begin(AsyncWebServer *server)
 			Serial.println("Set On Off: " + String(on));
 		
 			_onState = on;
+			
+			
+			saveConfig();
+			
+			
 			request->send(200);
 		} else {
 			request->send(400, "text/plain", "on needed");
@@ -234,6 +259,100 @@ void DeviceManager::begin(AsyncWebServer *server)
 	server->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
 		request->send(SPIFFS, "/index.html", String());
 	});
+}
+
+bool DeviceManager::loadConfig(unsigned int ledCount)
+{
+	Serial.println("Loading Config...");
+	
+	String filename = "config.cfg";	
+	File cfgFile = SPIFFS.open(filename, "r");
+	
+	if (!cfgFile) {
+		Serial.println("Config file doesnt exist");
+		return false;
+	}
+	
+	cfgFile.readBytes((char*) &_onState, sizeof(_onState));
+	
+	unsigned int physicalLedCount;
+	cfgFile.readBytes((char*) &physicalLedCount, sizeof(physicalLedCount));
+	
+	if (physicalLedCount != ledCount) {
+		cfgFile.close();
+		return false;
+	}
+	
+	if (!_device)
+		_device = new PhysicalDevice(physicalLedCount);
+	
+	unsigned int numRows;
+	cfgFile.readBytes((char*) &numRows, sizeof(numRows));
+	
+	Serial.println("Loading " + String(numRows) + " rows");
+	
+	for (int row = 0; row < numRows; row++) {
+		unsigned int numCols;
+		cfgFile.readBytes((char*) &numCols, sizeof(numCols));
+		
+		Serial.println("Row #" + String(row) + ": " + String(numCols) + " cols");
+		
+		std::vector<VirtualDevice*>* rowVector = new std::vector<VirtualDevice*>();
+		
+		for (int col = 0; col < numCols; col++) {
+			unsigned long deviceId;
+			cfgFile.readBytes((char*) &deviceId, sizeof(deviceId));
+			
+			VirtualDevice* device = new VirtualDevice(_device, deviceId);
+			rowVector->push_back(device);
+		}
+		
+		_deviceHierarchy.push_back(rowVector);
+	}
+	
+	cfgFile.close();
+	
+	return true;
+}
+
+void DeviceManager::saveConfig()
+{
+	Serial.println("Saving Config...");
+	
+	String filename = "config.cfg";
+	File cfgFile = SPIFFS.open(filename, "w");
+	
+	cfgFile.write((unsigned char*) &_onState, sizeof(_onState));
+	
+	unsigned int physicalLedCount = 0;
+	if (_device)
+		physicalLedCount = _device->getLedCount();
+	
+	cfgFile.write((unsigned char*) &physicalLedCount, sizeof(physicalLedCount));
+	
+	unsigned int numRows = _deviceHierarchy.size();
+	cfgFile.write((unsigned char*) &numRows, sizeof(numRows));
+	
+	for (int row = 0; row < numRows; row++) {
+		unsigned int numCols = _deviceHierarchy[row]->size();
+		cfgFile.write((unsigned char*) &numCols, sizeof(numCols));
+		
+		for (int col = 0; col < numCols; col++) {
+			VirtualDevice* device = _deviceHierarchy[row]->at(col);
+			
+			// just write the id of every device down
+			unsigned long deviceId = device->getId();
+			cfgFile.write((unsigned char*) &deviceId, sizeof(deviceId));
+			
+			// the device should autosave itself -> no need to save it one more time
+			/*
+			// and the save the device in its own file
+			// device->serialize();
+			*/
+		}
+	}
+	
+	cfgFile.close();
 }
 
 VirtualDevice* DeviceManager::getDevice(unsigned long id)

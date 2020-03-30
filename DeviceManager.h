@@ -2,6 +2,7 @@
 #define DEVICEMANAGER_H
 
 #include "PhysicalDevice.h"
+#include "DebugDevice.h"
 #include "VirtualDevice.h"
 
 #include <vector>
@@ -10,7 +11,7 @@
 
 class DeviceManager {
     private:
-        PhysicalDevice *_device;
+        PhysicalDevice *_device = NULL;
 		AsyncWebServer *_server = NULL;
 
         std::vector<std::vector<VirtualDevice*>*> _deviceHierarchy;
@@ -19,12 +20,15 @@ class DeviceManager {
 		bool _onState = true;
 		
 		void begin(AsyncWebServer *server);
+		
+		bool loadConfig(unsigned int ledCount);
+		void saveConfig();
 
     public:
         ~DeviceManager();
 
-        void begin(PhysicalDevice *device, AsyncWebServer *server);
-        void begin(int ledCount, AsyncWebServer *server);
+        void begin(DebugDevice *device, AsyncWebServer *server);
+        void begin(unsigned int ledCount, AsyncWebServer *server);
 		
 		VirtualDevice* getDevice(unsigned long id);
 		VirtualDevice* getDeviceAt(int index);

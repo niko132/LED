@@ -54,6 +54,36 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, int startIndex, int endInde
     resetAreas();
 }
 
+VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
+{
+	_device = device;
+	
+	String filename = "vd/" + String(id) + ".vd";
+	File file = SPIFFS.open(filename, "r");
+	
+	if (!file) { // just create a default device
+		_id = id;
+		_startIndex = 0;
+		_endIndex = device->getLedCount();
+		_mode = 0;
+		_posStart = 0.0;
+		_posEnd = 1.0;
+		_effectIndex = 0;
+	} else { // otherwise read from file
+		file.readBytes((char*) &_id, sizeof(_id));
+		file.readBytes((char*) &_startIndex, sizeof(_startIndex));
+		file.readBytes((char*) &_endIndex, sizeof(_endIndex));
+		file.readBytes((char*) &_mode, sizeof(_mode));
+		file.readBytes((char*) &_posStart, sizeof(_posStart));
+		file.readBytes((char*) &_posEnd, sizeof(_posEnd));
+		file.readBytes((char*) &_effectIndex, sizeof(_effectIndex));
+	}
+	
+	_palette = Palettes.getPalette("rainbow", getLedRangeCount());
+	setEffect(_effectIndex);
+	resetAreas();
+}
+
 VirtualDevice::~VirtualDevice()
 {
 	for (int i = 0; i < _subIndices.size(); i++) {
@@ -88,6 +118,8 @@ VirtualDevice::~VirtualDevice()
 			_syncHandler = NULL;
 		}
 	}
+	
+	// TODO: delete device from SPIFFS
 }
 
 void VirtualDevice::begin(AsyncWebServer *server)
@@ -150,12 +182,8 @@ void VirtualDevice::begin(AsyncWebServer *server)
 			IPAddress ipAddress;
 			ipAddress.fromString(ip);
 		
-			_syncRequests.push_back({ipAddress, id});
-			
-			
-			// TODO: new sync method
-			LEDSyncManager.startSync(this, ipAddress, id);
-			
+		
+			LEDSyncManager.startSync(this, ipAddress, id);	
 			
 		
 			request->send(200, "text/plain", "Start sync: " + ip + " - " + String(id));
@@ -224,18 +252,21 @@ void VirtualDevice::setStartIndex(int startIndex)
 {
     _startIndex = startIndex;
 	LEDSyncManager.deviceChanged(this);
+	serialize();
 }
 
 void VirtualDevice::setEndIndex(int endIndex)
 {
     _endIndex = endIndex;
 	LEDSyncManager.deviceChanged(this);
+	serialize();
 }
 
 void VirtualDevice::setMode(int mode)
 {
     _mode = mode;
 	LEDSyncManager.deviceChanged(this);
+	serialize();
 }
 
 void VirtualDevice::setEffect(int index)
@@ -275,6 +306,8 @@ void VirtualDevice::setEffect(int index)
 		_effect = new ColorFade(_palette);
 		_effectIndex = 0;
 	}
+	
+	serialize();
 }
 
 void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)
@@ -287,6 +320,8 @@ void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)
 	_effect = new CustomEffect(_palette, buf, length);
 	
 	_effectIndex = -1;
+	
+	serialize();
 }
 
 void VirtualDevice::setTimeValue(double val)
@@ -297,11 +332,13 @@ void VirtualDevice::setTimeValue(double val)
 void VirtualDevice::setPosStart(double posStart)
 {
 	_posStart = posStart;
+	serialize();
 }
 
 void VirtualDevice::setPosEnd(double posEnd)
 {
 	_posEnd = posEnd;
+	serialize();
 }
 
 void VirtualDevice::resetAreas()
@@ -403,6 +440,22 @@ double VirtualDevice::getLastTimeValue()
 Effect* VirtualDevice::getEffect()
 {
 	return _effect;
+}
+
+void VirtualDevice::serialize()
+{
+	String filename = "vd/" + String(_id) + ".vd";
+	File file = SPIFFS.open(filename, "w");
+	
+	file.write((unsigned char*) &_id, sizeof(_id));
+	file.write((unsigned char*) &_startIndex, sizeof(_startIndex));
+	file.write((unsigned char*) &_endIndex, sizeof(_endIndex));
+	file.write((unsigned char*) &_mode, sizeof(_mode));
+	file.write((unsigned char*) &_posStart, sizeof(_posStart));
+	file.write((unsigned char*) &_posEnd, sizeof(_posEnd));
+	file.write((unsigned char*) &_effectIndex, sizeof(_effectIndex));
+	
+	file.close();
 }
 
 void VirtualDevice::update(unsigned long delta)

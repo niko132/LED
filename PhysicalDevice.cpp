@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-PhysicalDevice::PhysicalDevice(int ledCount) :
+PhysicalDevice::PhysicalDevice(unsigned int ledCount) :
     _strip(ledCount)
 {
     _ledCount = ledCount;
@@ -23,7 +23,7 @@ void PhysicalDevice::begin()
     _strip.Show();
 }
 
-int PhysicalDevice::getLedCount()
+unsigned int PhysicalDevice::getLedCount()
 {
     return _ledCount;
 }
