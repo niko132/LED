@@ -234,7 +234,7 @@ void DeviceManager::begin(AsyncWebServer *server)
 		request->send(response);
 	});
 	
-	server->on("/get_devices", HTTP_GET, [this](AsyncWebServerRequest *request){		
+	server->on("/get_devices", HTTP_GET, [this](AsyncWebServerRequest *request){
 		AsyncJsonResponse *response = new AsyncJsonResponse(true, 4 * 1024);
 		JsonArray root = response->getRoot().as<JsonArray>();
 		

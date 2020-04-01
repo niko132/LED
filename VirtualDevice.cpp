@@ -77,6 +77,8 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
 		file.readBytes((char*) &_posStart, sizeof(_posStart));
 		file.readBytes((char*) &_posEnd, sizeof(_posEnd));
 		file.readBytes((char*) &_effectIndex, sizeof(_effectIndex));
+		
+		file.close();
 	}
 	
 	_palette = Palettes.getPalette("rainbow", getLedRangeCount());
@@ -138,6 +140,9 @@ void VirtualDevice::begin(AsyncWebServer *server)
 			index = jsonObj["index"].as<int>();
 			
 			setEffect(index);
+			
+			LEDSyncManager.deviceChanged(this);
+			
 			request->send(200, "text/plain", "Effect: " + String(index));
 		} else {
 			request->send(400, "text/plain", "index needed");

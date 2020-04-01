@@ -13,17 +13,17 @@
 
 AsyncWebServer server(80);
 
-/*
-IPAddress ip(192, 168, 178, 113);
+IPAddress ip(192, 168, 178, 111);
 
 IPAddress gateway(192, 168, 178, 1);
 IPAddress subnet(255, 255, 255, 0);
-*/
 
+/*
 IPAddress ip(192, 168, 2, 113);
 
 IPAddress gateway(192, 168, 2, 1);
 IPAddress subnet(255, 255, 255, 0);
+*/
 
 void setup() {
   // put your setup code here, to run once:
@@ -35,8 +35,8 @@ void setup() {
 
   // TODO: setup wifi
   WiFi.config(ip, gateway, subnet);
-  // WiFi.begin("WGLan", "94384322823429699220");
-  WiFi.begin("WLAN-RN22NX", "5152111417820959");
+  WiFi.begin("WGLan", "94384322823429699220");
+  // WiFi.begin("WLAN-RN22NX", "5152111417820959");
 
   Serial.print("Connecting");
   while (WiFi.status() != WL_CONNECTED)
@@ -58,8 +58,9 @@ void setup() {
   }
 
   // deviceManager = new DeviceManager(180);
-  DebugDevice *dd = new DebugDevice(180);
-  LEDDeviceManager.begin(dd, &server);
+  // DebugDevice *dd = new DebugDevice(180);
+  // LEDDeviceManager.begin(dd, &server);
+  LEDDeviceManager.begin(180, &server);
   LEDSyncManager.begin(&server);
   
   server.on("/free_heap", HTTP_GET, [](AsyncWebServerRequest *request) {

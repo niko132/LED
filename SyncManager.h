@@ -199,21 +199,7 @@ class ExternalSync : public SyncDevice {
 };
 
 class SyncManager {
-	private:
-		typedef struct
-		{
-			VirtualDevice *master;
-			IPAddress ip;
-			unsigned long id;
-		} SyncRequest;
-		
-		typedef struct
-		{
-			IPAddress ip;
-			unsigned long id;
-			int ledCount;
-		} SyncedDevice;
-		
+	private:		
 		AsyncWebServer *_server;
 		AsyncUDP _udp;
 		

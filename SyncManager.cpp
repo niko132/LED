@@ -112,19 +112,26 @@ void SyncManager::handleSearchResponse(AsyncUDPPacket *packet, unsigned int read
 	readOff += sizeof(deviceCount);
 	
 	Serial.println("Found " + String(deviceCount) + " new Devices");
-				
-	std::vector<unsigned long> ids;
-				
-	for (int i = 0; i < deviceCount; i++) {
-		unsigned long id;
-		memcpy(&id, &packet->data()[readOff], sizeof(unsigned long));
-		readOff += sizeof(id);
+	
+	if (deviceCount > 0) {
+		String ip = packet->remoteIP().toString();
+		std::vector<unsigned long> *ids = NULL;
+		
+		std::map<String, std::vector<unsigned long>*>::iterator it = _syncableDevices.find(ip);
+		if (it != _syncableDevices.end()) {
+			ids = it->second;
+		} else {
+			ids = new std::vector<unsigned long>();
+			_syncableDevices[ip] = ids;
+		}	
 					
-		ids.push_back(id);
-	}
-				
-	if (!ids.empty()) {
-		_syncableDevices[packet->remoteIP().toString()] = new std::vector<unsigned long>(ids);
+		for (int i = 0; i < deviceCount; i++) {
+			unsigned long id;
+			memcpy(&id, &packet->data()[readOff], sizeof(unsigned long));
+			readOff += sizeof(id);
+						
+			ids->push_back(id);
+		}
 	}
 }
 
@@ -342,6 +349,11 @@ void SyncManager::doSync(VirtualDevice *master, std::vector<SyncDevice*> *slaves
 
 void SyncManager::searchSyncableDevices()
 {
+	for (std::map<String, std::vector<unsigned long>*>::iterator it = _syncableDevices.begin(); it != _syncableDevices.end(); it++) {
+		delete it->second;
+		it->second = NULL;
+	}
+	
 	_syncableDevices.clear();
 	
 	// first add every local device
