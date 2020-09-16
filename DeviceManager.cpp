@@ -9,6 +9,8 @@
 #include "PingPong.h"
 #include "CustomEffect.h"
 
+#include "ESPLogger.h"
+
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
 #include <FS.h>
@@ -70,6 +72,8 @@ void DeviceManager::begin(AsyncWebServer *server)
 		int zIndex = 0; // default value
 		int mode = 0; // default value
 
+		Logger.println("ADD DEVICE");
+
 		if (jsonObj.containsKey("startIndex") && jsonObj.containsKey("endIndex")) {
 			startIndex = jsonObj["startIndex"].as<int>();
 			endIndex = jsonObj["endIndex"].as<int>();
@@ -81,6 +85,7 @@ void DeviceManager::begin(AsyncWebServer *server)
 				mode = jsonObj["mode"].as<int>();
 
 			Serial.println("Add: " + String(startIndex) + " " + String(endIndex) + " " + String(zIndex) + " " + String(mode));
+			Logger.println("Add: " + String(startIndex) + " " + String(endIndex) + " " + String(zIndex) + " " + String(mode));
 
 			unsigned long id = addDevice(startIndex, endIndex, zIndex, mode);
 
@@ -185,6 +190,8 @@ void DeviceManager::begin(AsyncWebServer *server)
 	server->addHandler(editHandler);
 	server->addHandler(removeHandler);
 	server->addHandler(onOffHandler);
+
+	Logger.println("Added handler");
 
 	server->on("/get_info", HTTP_GET, [this](AsyncWebServerRequest *request){
 		AsyncJsonResponse *response = new AsyncJsonResponse();

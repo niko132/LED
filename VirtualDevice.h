@@ -19,7 +19,7 @@ class VirtualDevice {
         int _mode;
         unsigned long _id;
 
-        CoverAlgorithm *_coverAlgorithm;
+        CoverAlgorithm *_coverAlgorithm = NULL;
 
 		double _posStart = 0.0;
 		double _posEnd = 1.0;

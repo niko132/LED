@@ -103,7 +103,6 @@ void loop() {
 
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
-  Logger.update();
 
   // TODO: implement heap check
   // Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
@@ -112,8 +111,9 @@ void loop() {
   LEDSyncManager.update();
 
   if (millis() - lastAliveMillis > 5 * 1000) {
+      Logger.update();
 	  Serial.println("Alive");
-      Logger.println("MAHHH");
+      Logger.println("Alive");
 	  lastAliveMillis = millis();
   }
 }

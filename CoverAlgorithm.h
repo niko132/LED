@@ -32,6 +32,10 @@ class CoverAlgorithm {
 
             int tmpNextIndex = currIndex + 1;
 
+            if (tmpNextIndex < _startIndex) {
+                tmpNextIndex = _startIndex;
+            }
+
             if (tmpNextIndex < _endIndex) {
                 (*nextIndex) = tmpNextIndex;
                 (*nextFrac) = (double) (tmpNextIndex - _startIndex) / count;

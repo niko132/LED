@@ -14,6 +14,8 @@
 #include "KeepLengthAlgorithm.h"
 #include "CollapseLengthAlgorithm.h"
 
+#include "ESPLogger.h"
+
 #include <FastLED.h>
 #include <AsyncJson.h>
 #include <ArduinoJson.h>
