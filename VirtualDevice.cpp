@@ -22,9 +22,7 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned int startIndex, un
     _device = device;
     _startIndex = startIndex;
     _endIndex = endIndex;
-    _mode = mode;
-
-    _coverAlgorithm = new KeepLengthAlgorithm(startIndex, endIndex);
+    setMode(mode);
 
     //TODO: update id generation
     _id = ESP.getCycleCount();
@@ -65,11 +63,13 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
 	String filename = "vd/" + String(id) + ".vd";
 	File file = SPIFFS.open(filename, "r");
 
+    int mode = 0;
+
 	if (!file) { // just create a default device
 		_id = id;
 		_startIndex = 0;
 		_endIndex = device->getLedCount();
-		_mode = 0;
+		mode = 0;
 		_posStart = 0.0;
 		_posEnd = 1.0;
 		_effectIndex = 0;
@@ -77,7 +77,7 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
 		file.readBytes((char*) &_id, sizeof(_id));
 		file.readBytes((char*) &_startIndex, sizeof(_startIndex));
 		file.readBytes((char*) &_endIndex, sizeof(_endIndex));
-		file.readBytes((char*) &_mode, sizeof(_mode));
+		file.readBytes((char*) &mode, sizeof(mode));
 		file.readBytes((char*) &_posStart, sizeof(_posStart));
 		file.readBytes((char*) &_posEnd, sizeof(_posEnd));
 		file.readBytes((char*) &_effectIndex, sizeof(_effectIndex));
@@ -85,7 +85,7 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
 		file.close();
 	}
 
-    _coverAlgorithm = new KeepLengthAlgorithm(_startIndex, _endIndex);
+    setMode(mode);
 
 	_palette = Palettes.getPalette("rainbow", getLedCount());
 	setEffect(_effectIndex);
@@ -272,10 +272,23 @@ void VirtualDevice::setEndIndex(int endIndex)
 
 void VirtualDevice::setMode(int mode)
 {
-    _mode = mode;
-    // TODO: change CoverAlgorithm
-	LEDSyncManager.deviceChanged(this);
-	serialize();
+    if (mode != _mode) {
+        _mode = mode;
+
+        if (_coverAlgorithm) {
+            delete _coverAlgorithm;
+            _coverAlgorithm = NULL;
+        }
+
+        if (mode == 1) {
+            _coverAlgorithm = new CollapseLengthAlgorithm(_startIndex, _endIndex);
+        } else {
+            _coverAlgorithm = new KeepLengthAlgorithm(_startIndex, _endIndex);
+        }
+
+    	LEDSyncManager.deviceChanged(this);
+    	serialize();
+    }
 }
 
 void VirtualDevice::setEffect(int index)
