@@ -136,7 +136,7 @@ void DeviceManager::begin(AsyncWebServer *server)
 	AsyncCallbackJsonWebHandler *removeHandler = new AsyncCallbackJsonWebHandler("/remove_device", [this](AsyncWebServerRequest *request, JsonVariant &json) {
 		JsonObject jsonObj = json.as<JsonObject>();
 		
-		unsigned long id = 0;
+		unsigned long id = 0; // mandatory
 		
 		if (jsonObj.containsKey("id")) {
 			id = jsonObj["id"].as<unsigned long>();

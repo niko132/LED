@@ -254,14 +254,6 @@ void SyncManager::handleEffectData(AsyncUDPPacket *packet, unsigned int readOff)
 
 void SyncManager::startSync(VirtualDevice *device, IPAddress ip, unsigned long id)
 {
-	SyncDevice *syncDevice = NULL;
-	
-	if (ip == WiFi.localIP()) {
-		syncDevice = new InternalSync(id);
-	} else {
-		syncDevice = new ExternalSync(ip, id, &_udp);
-	}
-	
 	std::vector<SyncDevice*> *syncedList = NULL;
 	
 	std::map<VirtualDevice*, std::vector<SyncDevice*>*>::iterator it = _syncs.find(device);
@@ -272,9 +264,26 @@ void SyncManager::startSync(VirtualDevice *device, IPAddress ip, unsigned long i
 		_syncs[device] = syncedList;
 	}
 	
+	// check if we are already synced
+	for (std::vector<SyncDevice*>::iterator it = syncedList->begin(); it != syncedList->end(); it++) {
+		if ((*it)->getIp() == ip && (*it)->getId() == id) {
+			return; // this device is already getting synced
+		}
+	}
+	
+	
+	SyncDevice *syncDevice = NULL;
+	
+	if (ip == WiFi.localIP()) {
+		syncDevice = new InternalSync(id);
+	} else {
+		syncDevice = new ExternalSync(ip, id, &_udp);
+	}
 	// TODO: search for this device in the synced list and reset it
 	
 	syncedList->push_back(syncDevice);
+	
+	deviceChanged(device);
 }
 
 void SyncManager::deviceChanged(VirtualDevice *device)

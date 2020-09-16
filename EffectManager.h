@@ -9,7 +9,7 @@
 
 class EffectManager {
 	private:
-		const unsigned int NUM_LOCAL_EFFECTS = 5;
+		const unsigned int NUM_LOCAL_EFFECTS = 6;
 	
 		int getLocalEffectIndex(String name);
 		CustomEffect* getEffect(File f, Palette *palette);

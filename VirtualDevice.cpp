@@ -133,7 +133,7 @@ void VirtualDevice::begin(AsyncWebServer *server)
 	_effectHandler = new AsyncCallbackJsonWebHandler("/" + String(_id) + "/set_effect", [this](AsyncWebServerRequest *request, JsonVariant &json) {
 		JsonObject jsonObj = json.as<JsonObject>();
 		
-		int index = -1;
+		int index = -1; // mandatory
 		
 		// TODO: implement effect by name
 		if (jsonObj.containsKey("index")) {
@@ -188,7 +188,7 @@ void VirtualDevice::begin(AsyncWebServer *server)
 			ipAddress.fromString(ip);
 		
 		
-			LEDSyncManager.startSync(this, ipAddress, id);	
+			LEDSyncManager.startSync(this, ipAddress, id);
 			
 		
 			request->send(200, "text/plain", "Start sync: " + ip + " - " + String(id));

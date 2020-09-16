@@ -5,6 +5,7 @@
 #include "StaticColor.h"
 #include "Snake.h"
 #include "PingPong.h"
+#include "Bubble.h"
 #include "CustomEffect.h"
 
 unsigned int EffectManager::getEffectCount()
@@ -32,6 +33,8 @@ int EffectManager::getLocalEffectIndex(String name)
 		return 3;
 	else if (name == "PingPong")
 		return 4;
+	else if (name == "Bubble")
+		return 5;
 	
 	return -1;
 }
@@ -90,6 +93,8 @@ Effect* EffectManager::getEffectAt(unsigned int index, Palette *palette)
 			return new Snake(palette);
 		case 4:
 			return new PingPong(palette);
+		case 5:
+			return new Bubble(palette);
 	}
 	
 	Dir fxDir = SPIFFS.openDir("fx");
@@ -122,6 +127,8 @@ String EffectManager::getEffectNameAt(unsigned int index)
 			return "Snake";
 		case 4:
 			return "PingPong";
+		case 5:
+			return "Bubble";
 	}
 	
 	Dir fxDir = SPIFFS.openDir("fx");
