@@ -11,6 +11,8 @@
 #include "DeviceManager.h"
 #include "SyncManager.h"
 
+#include "ESPLogger.h"
+
 AsyncWebServer server(80);
 
 IPAddress ip(192, 168, 178, 113);
@@ -30,7 +32,7 @@ void setup() {
 
   Serial.begin(9600);
   Serial.println("Booting...");
-  
+
   setupUpdateInterrupt();
 
   // TODO: setup wifi
@@ -50,7 +52,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   setupOTA();
-  
+
   // Initialize SPIFFS
   if(!SPIFFS.begin()){
     Serial.println("An Error has occurred while mounting SPIFFS");
@@ -62,18 +64,21 @@ void setup() {
   // LEDDeviceManager.begin(dd, &server);
   LEDDeviceManager.begin(180, &server);
   LEDSyncManager.begin(&server);
-  
+
   server.on("/free_heap", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Free Heap: " + String(ESP.getFreeHeap()));
   });
-  
+
   server.on("/heap_frag", HTTP_GET, [](AsyncWebServerRequest *request) {
 	  float frag = ESP.getHeapFragmentation();
-	  
+
 	  request->send(200, "text/plain", "Heap Fragmentation: " + String(frag) + "%");
   });
-  
+
   server.begin();
+
+  Logger.begin();
+  Logger.println("READY");
 }
 
 unsigned long lastAliveMillis = 0;
@@ -89,24 +94,26 @@ void loop() {
   if (millis() > fpsNextMillis) {
 	  int fps = (float) frameCounter / FPS_INTERVAL;
 	  Serial.println(String(fps) + "FPS");
-	  
+
 	  fpsNextMillis = millis() + FPS_INTERVAL * 1000;
 	  frameCounter = 0;
   }
   */
-	
-	
+
+
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
-  
+  Logger.update();
+
   // TODO: implement heap check
   // Serial.println("Free Heap: " + String(ESP.getFreeHeap()));
 
   LEDDeviceManager.update();
   LEDSyncManager.update();
-  
+
   if (millis() - lastAliveMillis > 5 * 1000) {
 	  Serial.println("Alive");
+      Logger.println("MAHHH");
 	  lastAliveMillis = millis();
   }
 }

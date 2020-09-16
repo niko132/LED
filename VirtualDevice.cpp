@@ -12,6 +12,7 @@
 #include "CustomEffect.h"
 
 #include "KeepLengthAlgorithm.h"
+#include "CollapseLengthAlgorithm.h"
 
 #include <FastLED.h>
 #include <AsyncJson.h>
