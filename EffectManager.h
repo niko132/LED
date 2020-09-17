@@ -10,18 +10,19 @@
 class EffectManager {
 	private:
 		const unsigned int NUM_LOCAL_EFFECTS = 6;
-	
+
 		int getLocalEffectIndex(String name);
 		CustomEffect* getEffect(File f, Palette *palette);
 		String getShortFileName(String filename);
-	
-	public:	
+
+	public:
 		unsigned int getEffectCount();
 		Effect* getEffect(String name, Palette *palette);
 		Effect* getEffectAt(unsigned int index, Palette *palette);
-		
+		Effect* getDefaultEffect(Palette *palette);
+
 		String getEffectNameAt(unsigned int index);
-		
+
 		int createEffect(CustomEffect *effect);
 		void deleteEffect(String name);
 };

@@ -250,7 +250,7 @@ function createDeviceBlock(device) {
 		
 	$.each(effects, function(i, item) {
 		var row = {};
-		row.value = item.index;
+		row.value = item.name;
 		row.name = item.name;
 			
 		l.push(row);
@@ -260,7 +260,7 @@ function createDeviceBlock(device) {
 		$.ajax({
 			url: '/' + device.id + '/set_effect',
 			type: 'POST',
-			data: JSON.stringify({index: val}),
+			data: JSON.stringify({name: val}),
 			contentType: 'application/json'
 		});
 	});

@@ -14,6 +14,8 @@
 #include "KeepLengthAlgorithm.h"
 #include "CollapseLengthAlgorithm.h"
 
+#include "SyncTime.h"
+
 #include "ESPLogger.h"
 
 #include <FastLED.h>
@@ -23,38 +25,18 @@
 VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned int startIndex, unsigned int endIndex, int mode)
 {
     _device = device;
-    _startIndex = startIndex;
-    _endIndex = endIndex;
+    _coverAlgorithm = new KeepLengthAlgorithm(startIndex, endIndex);
+    // TODO: do it a bit more elegant
+    _syncAlgorithm = new SyncTime(0, NULL, getLedCount());
     setMode(mode);
 
     //TODO: update id generation
     _id = ESP.getCycleCount();
 
-	/*
-	// generate default rainbow palette
-	std::vector<ColorKey> colors;
-
-	for (int i = 0; i < 256; i++) {
-		double pos = (double) i / 255.0;
-		CRGB color = CHSV(i, 255, 255);
-
-		colors.push_back({pos, color});
-	}
-
-    _palette = new Palette(colors);
-	*/
-
 	_palette = Palettes.getPalette("rainbow", getLedCount());
 
-
     // default effect
-
-	setEffect(0);
-
-    // _effect = new ColorCycle(_palette);
-	// _effect = new ColorFade();
-	// _effect = new StaticColor();
-	// _effect = new Snake();
+	setEffect("");
 
     _coverAlgorithm->resetCovered();
 }
@@ -66,40 +48,49 @@ VirtualDevice::VirtualDevice(PhysicalDevice *device, unsigned long id)
 	String filename = "vd/" + String(id) + ".vd";
 	File file = SPIFFS.open(filename, "r");
 
+    unsigned int startIndex = 0;
+    unsigned int endIndex = 0;
     int mode = 0;
+    String effectName = "";
 
 	if (!file) { // just create a default device
 		_id = id;
-		_startIndex = 0;
-		_endIndex = device->getLedCount();
+		startIndex = 0;
+		endIndex = device->getLedCount();
 		mode = 0;
 		_posStart = 0.0;
 		_posEnd = 1.0;
-		_effectIndex = 0;
+		effectName = "";
 	} else { // otherwise read from file
 		file.readBytes((char*) &_id, sizeof(_id));
-		file.readBytes((char*) &_startIndex, sizeof(_startIndex));
-		file.readBytes((char*) &_endIndex, sizeof(_endIndex));
+		file.readBytes((char*) &startIndex, sizeof(startIndex));
+		file.readBytes((char*) &endIndex, sizeof(endIndex));
 		file.readBytes((char*) &mode, sizeof(mode));
 		file.readBytes((char*) &_posStart, sizeof(_posStart));
 		file.readBytes((char*) &_posEnd, sizeof(_posEnd));
-		file.readBytes((char*) &_effectIndex, sizeof(_effectIndex));
+
+        effectName = file.readStringUntil((char) 0);
 
 		file.close();
 	}
 
+    _coverAlgorithm = new KeepLengthAlgorithm(startIndex, endIndex);
+    _syncAlgorithm = new SyncTime(0, NULL, getLedCount());
     setMode(mode);
 
 	_palette = Palettes.getPalette("rainbow", getLedCount());
-	setEffect(_effectIndex);
+	setEffect(effectName);
 	_coverAlgorithm->resetCovered();
 }
 
 VirtualDevice::~VirtualDevice()
 {
-	if (_effect) {
-		delete _effect;
-		_effect = NULL;
+    Effect *effect = _syncAlgorithm->getEffect();
+    _syncAlgorithm->setEffect(NULL);
+
+	if (effect) {
+		delete effect;
+		effect = NULL;
 	}
 
 	if (_palette) {
@@ -137,17 +128,17 @@ void VirtualDevice::begin(AsyncWebServer *server)
 	_effectHandler = new AsyncCallbackJsonWebHandler("/" + String(_id) + "/set_effect", [this](AsyncWebServerRequest *request, JsonVariant &json) {
 		JsonObject jsonObj = json.as<JsonObject>();
 
-		int index = -1; // mandatory
+		String name = ""; // mandatory
 
 		// TODO: implement effect by name
-		if (jsonObj.containsKey("index")) {
-			index = jsonObj["index"].as<int>();
+		if (jsonObj.containsKey("name")) {
+			name = jsonObj["name"].as<String>();
 
-			setEffect(index);
+			setEffect(name);
 
 			LEDSyncManager.deviceChanged(this);
 
-			request->send(200, "text/plain", "Effect: " + String(index));
+			request->send(200, "text/plain", "Effect: " + name);
 		} else {
 			request->send(400, "text/plain", "index needed");
 		}
@@ -205,18 +196,19 @@ void VirtualDevice::begin(AsyncWebServer *server)
 		String effectJson;
 		serializeJson(json, effectJson);
 
-		// delete old effect
-		if (_effect) {
-			delete _effect;
-			_effect = NULL;
+		// create the new one
+		Effect *effect = new CustomEffect(_palette, effectJson);
+
+        Effect *oldEffect = _syncAlgorithm->setEffect(effect);
+
+        // delete old effect
+		if (oldEffect) {
+			delete oldEffect;
+			oldEffect = NULL;
 		}
 
-		// create the new one
-		_effect = new CustomEffect(_palette, effectJson);
-
-		_effectIndex = LEDEffectManager.createEffect((CustomEffect*) _effect);
-		Serial.println("New Effect: " + String(_effectIndex));
-
+		LEDEffectManager.createEffect((CustomEffect*) effect);
+		Serial.println("New Effect: " + effect->getName());
 
 		LEDSyncManager.deviceChanged(this);
 
@@ -259,16 +251,16 @@ void VirtualDevice::begin(AsyncWebServer *server)
 
 void VirtualDevice::setStartIndex(int startIndex)
 {
-    _startIndex = startIndex;
     _coverAlgorithm->setStartIndex(startIndex);
+    _syncAlgorithm->setLength(getLedCount());
 	LEDSyncManager.deviceChanged(this);
 	serialize();
 }
 
 void VirtualDevice::setEndIndex(int endIndex)
 {
-    _endIndex = endIndex;
     _coverAlgorithm->setEndIndex(endIndex);
+    _syncAlgorithm->setLength(getLedCount());
 	LEDSyncManager.deviceChanged(this);
 	serialize();
 }
@@ -278,80 +270,64 @@ void VirtualDevice::setMode(int mode)
     if (mode != _mode) {
         _mode = mode;
 
+        unsigned int startIndex = 0;
+        unsigned int endIndex = 0;
+
         if (_coverAlgorithm) {
+            startIndex = _coverAlgorithm->getStartIndex();
+            endIndex = _coverAlgorithm->getEndIndex();
+
             delete _coverAlgorithm;
             _coverAlgorithm = NULL;
         }
 
         if (mode == 1) {
-            _coverAlgorithm = new CollapseLengthAlgorithm(_startIndex, _endIndex);
+            _coverAlgorithm = new CollapseLengthAlgorithm(startIndex, endIndex);
         } else {
-            _coverAlgorithm = new KeepLengthAlgorithm(_startIndex, _endIndex);
+            _coverAlgorithm = new KeepLengthAlgorithm(startIndex, endIndex);
         }
+
+        _syncAlgorithm->setLength(getLedCount());
 
     	LEDSyncManager.deviceChanged(this);
     	serialize();
     }
 }
 
-void VirtualDevice::setEffect(int index)
+void VirtualDevice::setEffect(String name)
 {
-	if (_effect) {
-		delete _effect;
-		_effect = NULL;
+    Effect *effect = LEDEffectManager.getEffect(name, _palette);
+
+    if (!effect) { // load default effect
+		effect = LEDEffectManager.getDefaultEffect(_palette);
 	}
 
-	/*
-	switch(index) {
-		case 1:
-			_effect = new ColorFade(_palette);
-			break;
-		case 2:
-			_effect = new StaticColor(_palette);
-			break;
-		case 3:
-			_effect = new Snake(_palette);
-			break;
-		case 4:
-			_effect = new PingPong(_palette);
-			break;
-		default:
-			_effect = new ColorCycle(_palette);
-	}
+    effect = _syncAlgorithm->setEffect(effect);
 
-	_effectIndex = index;
-	LEDSyncManager.deviceChanged(this);
-	*/
-
-	_effect = LEDEffectManager.getEffectAt(index, _palette);
-
-	if (_effect) {
-		_effectIndex = index;
-	} else { // load default effect
-		_effect = new ColorFade(_palette);
-		_effectIndex = 0;
-	}
+    if (effect) {
+        delete effect;
+        effect = NULL;
+    }
 
 	serialize();
 }
 
 void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)
 {
-	if (_effect) {
-		delete _effect;
-		_effect = NULL;
-	}
+	Effect *effect = new CustomEffect(_palette, buf, length);
+	effect = _syncAlgorithm->setEffect(effect);
 
-	_effect = new CustomEffect(_palette, buf, length);
-
-	_effectIndex = -1;
+    if (effect) {
+        delete effect;
+        effect = NULL;
+    }
 
 	serialize();
 }
 
-void VirtualDevice::setTimeValue(double val)
+void VirtualDevice::setTimeOffset(unsigned long timeOffset)
 {
-	_lastTimeValue = val;
+	_syncAlgorithm->setTimeOffset(timeOffset);
 }
 
 void VirtualDevice::setPosStart(double posStart)
@@ -378,12 +354,12 @@ void VirtualDevice::addCovered(unsigned int startIndex, unsigned int endIndex)
 
 unsigned int VirtualDevice::getStartIndex()
 {
-    return _startIndex;
+    return _coverAlgorithm->getStartIndex();
 }
 
 unsigned int VirtualDevice::getEndIndex()
 {
-    return _endIndex;
+    return _coverAlgorithm->getEndIndex();
 }
 
 unsigned int VirtualDevice::getLedCount()
@@ -394,11 +370,6 @@ unsigned int VirtualDevice::getLedCount()
 int VirtualDevice::getMode()
 {
     return _mode;
-}
-
-int VirtualDevice::getEffectIndex()
-{
-	return _effectIndex;
 }
 
 double VirtualDevice::getPosStart()
@@ -416,14 +387,14 @@ unsigned long VirtualDevice::getId()
     return _id;
 }
 
-double VirtualDevice::getLastTimeValue()
+unsigned long VirtualDevice::getTimeOffset()
 {
-	return _lastTimeValue;
+	return _syncAlgorithm->getTimeOffset();
 }
 
 Effect* VirtualDevice::getEffect()
 {
-	return _effect;
+	return _syncAlgorithm->getEffect();
 }
 
 void VirtualDevice::serialize()
@@ -431,39 +402,52 @@ void VirtualDevice::serialize()
 	String filename = "vd/" + String(_id) + ".vd";
 	File file = SPIFFS.open(filename, "w");
 
+    unsigned int startIndex = _coverAlgorithm->getStartIndex();
+    unsigned int endIndex = _coverAlgorithm->getEndIndex();
+
 	file.write((unsigned char*) &_id, sizeof(_id));
-	file.write((unsigned char*) &_startIndex, sizeof(_startIndex));
-	file.write((unsigned char*) &_endIndex, sizeof(_endIndex));
+	file.write((unsigned char*) &startIndex, sizeof(startIndex));
+	file.write((unsigned char*) &endIndex, sizeof(endIndex));
 	file.write((unsigned char*) &_mode, sizeof(_mode));
 	file.write((unsigned char*) &_posStart, sizeof(_posStart));
 	file.write((unsigned char*) &_posEnd, sizeof(_posEnd));
-	file.write((unsigned char*) &_effectIndex, sizeof(_effectIndex));
+
+    String effectName = "";
+
+    if (getEffect()) {
+        effectName = getEffect()->getName();
+    }
+
+    file.write((unsigned char*) effectName.c_str(), effectName.length() + 1);
 
 	file.close();
 }
 
-void VirtualDevice::update(unsigned long delta)
+void VirtualDevice::update()
 {
-	unsigned long duration = (unsigned long) (_effect->getDuration() * 1000.0);
+    Effect *effect = _syncAlgorithm->getEffect();
 
-	delta = delta % duration; // 5 secs
-	double timeValue = _lastTimeValue + (double) delta / duration;
+	unsigned long duration = (unsigned long) (effect->getDuration() * 1000.0);
+
+    unsigned long current = millis() - _syncAlgorithm->getTimeOffset();
+    current = current % duration; // 5 secs
+
+	double timeValue = (double) current / duration;
 	timeValue -= (int) timeValue;
 
     int currIndex = -1; // use -1 to start at the first index in the loop
     double currFrac = 0.0;
+    int relIndex = 0;
 
     while (_coverAlgorithm->nextIndex(currIndex, &currIndex, &currFrac)) {
         double posValue = _posStart + currFrac * (_posEnd - _posStart);
         posValue -= (int) posValue;
 
-        CRGB color = _effect->update(timeValue, posValue);
+        CRGB color = _syncAlgorithm->updatePixel(timeValue, posValue, relIndex++, effect);
 
         unsigned char *p = &_device->getPixelBuf()[currIndex * 3];
         p[0] = color.r;
         p[1] = color.g;
         p[2] = color.b;
     }
-
-	_lastTimeValue = timeValue;
 }

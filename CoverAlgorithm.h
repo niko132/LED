@@ -3,22 +3,30 @@
 
 class CoverAlgorithm {
     protected:
-        unsigned int _startIndex;
-        unsigned int _endIndex;
+        unsigned int _startIndex = 0;
+        unsigned int _endIndex = 0;
 
     public:
         CoverAlgorithm(unsigned int startIndex, unsigned int endIndex) {
             _startIndex = startIndex;
             _endIndex = endIndex;
-        }
+        };
+
+        unsigned int getStartIndex() {
+            return _startIndex;
+        };
 
         void setStartIndex(unsigned int startIndex) {
             _startIndex = startIndex;
-        }
+        };
+
+        unsigned int getEndIndex() {
+            return _endIndex;
+        };
 
         void setEndIndex(unsigned int endIndex) {
             _endIndex = endIndex;
-        }
+        };
 
         virtual unsigned int getLedCount() {
             return _endIndex - _startIndex;

@@ -208,14 +208,14 @@ void SyncManager:: handleSyncConfig(AsyncUDPPacket *packet, unsigned int readOff
 		memcpy(&posEnd, &packet->data()[readOff], sizeof(posEnd));
 		readOff += sizeof(posEnd);
 
-		double timeVal;
-		memcpy(&timeVal, &packet->data()[readOff], sizeof(timeVal));
-		readOff += sizeof(timeVal);
+		unsigned long timeOffset;
+		memcpy(&timeOffset, &packet->data()[readOff], sizeof(timeOffset));
+		readOff += sizeof(timeOffset);
 
 
 		device->setPosStart(posStart);
 		device->setPosEnd(posEnd);
-		device->setTimeValue(timeVal);
+		device->setTimeOffset(timeOffset);
 	}
 }
 
@@ -228,11 +228,15 @@ void SyncManager::handleEffectIndex(AsyncUDPPacket *packet, unsigned int readOff
 	VirtualDevice* device = LEDDeviceManager.getDevice(id);
 
 	if (device) {
-		int index;
-		memcpy(&index, &packet->data()[readOff], sizeof(index));
-		readOff += sizeof(index);
+		String effectName = "";
+		unsigned char c = packet->data()[readOff++];
 
-		device->setEffect(index);
+		while (c != 0) {
+			effectName += c;
+			c = packet->data()[readOff++];
+		}
+
+		device->setEffect(effectName);
 	}
 }
 
@@ -291,6 +295,8 @@ void SyncManager::deviceChanged(VirtualDevice *device)
 	std::map<VirtualDevice*, std::vector<SyncDevice*>*>::iterator it = _syncs.find(device);
 	if (it != _syncs.end()) {
 		VirtualDevice *master = it->first;
+
+		/*
 		int effectIndex = master->getEffectIndex();
 
 		if (effectIndex < 0) { // Custom Effect
@@ -321,6 +327,17 @@ void SyncManager::deviceChanged(VirtualDevice *device)
 				syncDevice->setEffect(effectIndex);
 			}
 		}
+		*/
+
+		String effectName = master->getEffect()->getName();
+
+		for (std::vector<SyncDevice*>::iterator it2 = it->second->begin(); it2 != it->second->end(); it2++) {
+			SyncDevice* syncDevice = *it2;
+
+			Serial.println("Syncing Effect n: " + String(syncDevice->getId()));
+
+			syncDevice->setEffect(effectName);
+		}
 
 
 		// TODO: resend effect and palette settings
@@ -344,7 +361,7 @@ void SyncManager::doSync(VirtualDevice *master, std::vector<SyncDevice*> *slaves
 	master->setPosStart(posStart);
 	master->setPosEnd(posEnd);
 
-	double timeValue = master->getLastTimeValue();
+	unsigned long timeOffset = master->getTimeOffset();
 
 	for (std::vector<SyncDevice*>::iterator it = slaves->begin(); it != slaves->end(); it++) {
 		posStart = posEnd;
@@ -352,7 +369,7 @@ void SyncManager::doSync(VirtualDevice *master, std::vector<SyncDevice*> *slaves
 		endCount += (*it)->getLedCount();
 		posEnd = (double) endCount / totalCount;
 
-		(*it)->doSync(posStart, posEnd, timeValue);
+		(*it)->doSync(posStart, posEnd, timeOffset);
 	}
 }
 

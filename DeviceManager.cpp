@@ -253,7 +253,9 @@ void DeviceManager::begin(AsyncWebServer *server)
 			deviceObject["ledRangeCount"] = getDeviceAt(i)->getLedCount();
 			deviceObject["zIndex"] = getDeviceZIndex(getDeviceAt(i));
 			deviceObject["mode"] = getDeviceAt(i)->getMode();
-			deviceObject["effectIndex"] = getDeviceAt(i)->getEffectIndex();
+
+			deviceObject["effectName"] = getDeviceAt(i)->getEffect()->getName();
+
 			deviceObject["posStart"] = getDeviceAt(i)->getPosStart();
 			deviceObject["posEnd"] = getDeviceAt(i)->getPosEnd();
 			deviceObject["id"] = getDeviceAt(i)->getId();
@@ -575,7 +577,7 @@ void DeviceManager::update()
 		if (_onState) {
 			for (int row = 0; row < _deviceHierarchy.size(); row++) {
 				for (int col = 0; col < _deviceHierarchy[row]->size(); col++) {
-					_deviceHierarchy[row]->at(col)->update(currentMillis - _lastUpdateMillis);
+					_deviceHierarchy[row]->at(col)->update();
 				}
 			}
 		}

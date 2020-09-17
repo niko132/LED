@@ -6,6 +6,7 @@
 #include "Effect.h"
 
 #include "CoverAlgorithm.h"
+#include "SyncAlgorithm.h"
 
 #include <vector>
 #include <ESPAsyncWebServer.h>
@@ -14,12 +15,11 @@
 class VirtualDevice {
     private:
         PhysicalDevice *_device;
-        unsigned int _startIndex;
-        unsigned int _endIndex;
         int _mode;
         unsigned long _id;
 
         CoverAlgorithm *_coverAlgorithm = NULL;
+        SyncAlgorithm *_syncAlgorithm = NULL;
 
 		double _posStart = 0.0;
 		double _posEnd = 1.0;
@@ -27,9 +27,6 @@ class VirtualDevice {
 		AsyncWebServer *_server;
 
 		Palette *_palette = NULL;
-        Effect *_effect = NULL;
-		int _effectIndex = 0;
-		double _lastTimeValue = 0;
 
 		AsyncCallbackJsonWebHandler *_effectHandler = NULL;
 		AsyncCallbackJsonWebHandler *_posHandler = NULL;
@@ -46,9 +43,9 @@ class VirtualDevice {
         void setEndIndex(int endIndex);
         void setMode(int mode);
 
-		void setEffect(int index);
+		void setEffect(String name);
 		void setEffect(unsigned char *buf, unsigned int length);
-		void setTimeValue(double val);
+		void setTimeOffset(unsigned long timeOffset);
 
 		void setPosStart(double posStart);
 		void setPosEnd(double posEnd);
@@ -60,17 +57,16 @@ class VirtualDevice {
         unsigned int getEndIndex();
 		unsigned int getLedCount();
         int getMode();
-		int getEffectIndex();
 		double getPosStart();
 		double getPosEnd();
         unsigned long getId();
 
-		double getLastTimeValue();
+		unsigned long getTimeOffset();
 		Effect *getEffect();
 
 		void serialize();
 
-        void update(unsigned long delta);
+        void update();
 };
 
 #endif // VIRTUALDEVICE_H

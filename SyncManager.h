@@ -26,7 +26,7 @@ class SyncDevice {
 
 	protected:
 		virtual void retrieveLedCountInt() = 0;
-		virtual void doSyncInt(double posStart, double posEnd, double timeValue) = 0;
+		virtual void doSyncInt(double posStart, double posEnd, unsigned long timeOffset) = 0;
 
 	public:
 		SyncDevice(IPAddress ip, unsigned long id) {
@@ -62,12 +62,12 @@ class SyncDevice {
 			}
 		};
 
-		void doSync(double posStart, double posEnd, double timeValue) {
-			doSyncInt(posStart, posEnd, timeValue);
+		void doSync(double posStart, double posEnd, unsigned long timeOffset) {
+			doSyncInt(posStart, posEnd, timeOffset);
 			_needsSync = false;
 		};
 
-		virtual void setEffect(int index) = 0;
+		virtual void setEffect(String name) = 0;
 		virtual void setEffect(unsigned char *data, unsigned int length) = 0;
 };
 
@@ -82,10 +82,10 @@ class InternalSync : public SyncDevice {
 			}
 		};
 
-		void doSyncInt(double posStart, double posEnd, double timeValue) {
+		void doSyncInt(double posStart, double posEnd, unsigned long timeOffset) {
 			_device->setPosStart(posStart);
 			_device->setPosEnd(posEnd);
-			_device->setTimeValue(timeValue);
+			_device->setTimeOffset(timeOffset);
 		};
 
 	public:
@@ -93,8 +93,8 @@ class InternalSync : public SyncDevice {
 			_device = LEDDeviceManager.getDevice(id);
 		};
 
-		void setEffect(int index) {
-			_device->setEffect(index);
+		void setEffect(String name) {
+			_device->setEffect(name);
 		};
 
 		void setEffect(unsigned char *data, unsigned int length) {
@@ -126,7 +126,7 @@ class ExternalSync : public SyncDevice {
 			delete[] buf;
 		};
 
-		void doSyncInt(double posStart, double posEnd, double timeValue) {
+		void doSyncInt(double posStart, double posEnd, unsigned long timeOffset) {
 			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + 3 * sizeof(double)];
 			unsigned int writeOff = 0;
 
@@ -146,8 +146,8 @@ class ExternalSync : public SyncDevice {
 			memcpy(&buf[writeOff], &posEnd, sizeof(posEnd));
 			writeOff += sizeof(posEnd);
 
-			memcpy(&buf[writeOff], &timeValue, sizeof(timeValue));
-			writeOff += sizeof(timeValue);
+			memcpy(&buf[writeOff], &timeOffset, sizeof(timeOffset));
+			writeOff += sizeof(timeOffset);
 
 			_udp->writeTo(buf, writeOff, getIp(), 6789);
 
@@ -159,7 +159,7 @@ class ExternalSync : public SyncDevice {
 			_udp = udp;
 		};
 
-		void setEffect(int index) {
+		void setEffect(String name) {
 			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + sizeof(int)];
 			unsigned int writeOff = 0;
 
@@ -173,8 +173,8 @@ class ExternalSync : public SyncDevice {
 			memcpy(&buf[writeOff], &id, sizeof(id));
 			writeOff += sizeof(id);
 
-			memcpy(&buf[writeOff], &index, sizeof(index));
-			writeOff += sizeof(index);
+			memcpy(&buf[writeOff], name.c_str(), name.length() + 1);
+			writeOff += name.length() + 1;
 
 			_udp->writeTo(buf, writeOff, getIp(), 6789);
 		};
