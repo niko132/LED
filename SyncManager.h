@@ -3,6 +3,7 @@
 
 #include "VirtualDevice.h"
 #include "DeviceManager.h"
+#include "Magic.h"
 
 #include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
@@ -11,8 +12,7 @@
 #include <map>
 #include <vector>
 
-const unsigned char MAGIC[4] = { 0x92, 0xB3, 0x1F, 0x12 };
-const unsigned char MAGIC_LENGTH = 4;
+#include "ESPLogger.h"
 
 class SyncDevice {
 	private:
@@ -67,6 +67,8 @@ class SyncDevice {
 			_needsSync = false;
 		};
 
+		virtual void setSyncConfig(IPAddress ip, unsigned long id, int mode) = 0;
+
 		virtual void setEffect(String name) = 0;
 		virtual void setEffect(unsigned char *data, unsigned int length) = 0;
 };
@@ -85,7 +87,8 @@ class InternalSync : public SyncDevice {
 		void doSyncInt(double posStart, double posEnd, unsigned long timeOffset) {
 			_device->setPosStart(posStart);
 			_device->setPosEnd(posEnd);
-			_device->setTimeOffset(timeOffset);
+
+			_device->syncTimeOffset(timeOffset);
 		};
 
 	public:
@@ -93,8 +96,12 @@ class InternalSync : public SyncDevice {
 			_device = LEDDeviceManager.getDevice(id);
 		};
 
+		void setSyncConfig(IPAddress ip, unsigned long id, int mode) {
+			_device->setSyncMode(mode);
+		};
+
 		void setEffect(String name) {
-			_device->setEffect(name);
+			_device->syncEffect(name);
 		};
 
 		void setEffect(unsigned char *data, unsigned int length) {
@@ -108,50 +115,40 @@ class ExternalSync : public SyncDevice {
 
 	protected:
 		void retrieveLedCountInt() {
-			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long)];
-			unsigned int writeOff = 0;
-
-			memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-			writeOff += MAGIC_LENGTH;
-
-			buf[writeOff++] = 11; // request led count
-
+			unsigned char type = 11; // request led count
 			unsigned long id = getId();
 
-			memcpy(&buf[writeOff], &id, sizeof(id));
-			writeOff += sizeof(id);
+			MagicWriter writer;
+			writer.write(type);
+			writer.write(id);
 
-			_udp->writeTo(buf, writeOff, getIp(), 6789);
+			unsigned char *buf = NULL;
+			unsigned int length = 0;
+			buf = writer.getData(&length);
 
-			delete[] buf;
+			Logger.println("Sending led count request...");
+
+			_udp->writeTo(buf, length, getIp(), 6789);
 		};
 
 		void doSyncInt(double posStart, double posEnd, unsigned long timeOffset) {
-			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + 3 * sizeof(double)];
-			unsigned int writeOff = 0;
-
-			memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-			writeOff += MAGIC_LENGTH;
-
-			buf[writeOff++] = 13; // response sync config
-
+			unsigned char type = 13; // response sync config
 			unsigned long id = getId();
 
-			memcpy(&buf[writeOff], &id, sizeof(id));
-			writeOff += sizeof(id);
+			MagicWriter writer;
+			writer.write(type);
+			writer.write(id);
+			writer.write(posStart);
+			writer.write(posEnd);
+			writer.write(timeOffset);
 
-			memcpy(&buf[writeOff], &posStart, sizeof(posStart));
-			writeOff += sizeof(posStart);
+			unsigned char *buf = NULL;
+			unsigned int length = 0;
+			buf = writer.getData(&length);
 
-			memcpy(&buf[writeOff], &posEnd, sizeof(posEnd));
-			writeOff += sizeof(posEnd);
+			Logger.println("Sending sync data...");
 
-			memcpy(&buf[writeOff], &timeOffset, sizeof(timeOffset));
-			writeOff += sizeof(timeOffset);
-
-			_udp->writeTo(buf, writeOff, getIp(), 6789);
-
-			delete[] buf;
+			_udp->writeTo(buf, length, getIp(), 6789);
 		};
 
 	public:
@@ -159,42 +156,58 @@ class ExternalSync : public SyncDevice {
 			_udp = udp;
 		};
 
+		void setSyncConfig(IPAddress ip, unsigned long id, int mode) {
+			unsigned char type = 16; // response sync Config
+			unsigned long ownId = getId();
+
+			MagicWriter writer;
+			writer.write(type);
+			writer.write(ownId);
+			writer.write(mode);
+
+			unsigned char *buf = NULL;
+			unsigned int length = 0;
+			buf = writer.getData(&length);
+
+			Logger.println("Sending Config...");
+
+			_udp->writeTo(buf, length, getIp(), 6789);
+		};
+
 		void setEffect(String name) {
-			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + sizeof(int)];
-			unsigned int writeOff = 0;
-
-			memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-			writeOff += MAGIC_LENGTH;
-
-			buf[writeOff++] = 14; // response effect index
-
+			unsigned char type = 14; // response effect name
 			unsigned long id = getId();
 
-			memcpy(&buf[writeOff], &id, sizeof(id));
-			writeOff += sizeof(id);
+			MagicWriter writer;
+			writer.write(type);
+			writer.write(id);
+			writer.write(name);
 
-			memcpy(&buf[writeOff], name.c_str(), name.length() + 1);
-			writeOff += name.length() + 1;
+			unsigned char *buf = NULL;
+			unsigned int length = 0;
+			buf = writer.getData(&length);
 
-			_udp->writeTo(buf, writeOff, getIp(), 6789);
+			Logger.println("Sending effect...");
+
+			_udp->writeTo(buf, length, getIp(), 6789);
 		};
 
 		void setEffect(unsigned char *data, unsigned int length) {
-			unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + length];
-			unsigned int writeOff = 0;
-
-			memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-			writeOff += MAGIC_LENGTH;
-
-			buf[writeOff++] = 15; // response effect data
-
+			unsigned char type = 15; // response effect data
 			unsigned long id = getId();
 
-			memcpy(&buf[writeOff], &id, sizeof(id));
-			writeOff += sizeof(id);
+			MagicWriter writer;
+			writer.write(type);
+			writer.write(id);
+			writer.write(data, length);
 
-			memcpy(&buf[writeOff], data, length);
-			writeOff += length;
+			unsigned char *buf = NULL;
+			unsigned int bufLength = 0;
+			buf = writer.getData(&bufLength);
+
+			Logger.println("Sending effect data...");
+
+			_udp->writeTo(buf, bufLength, getIp(), 6789);
 		};
 };
 
@@ -212,15 +225,16 @@ class SyncManager {
 		SyncManager();
 		void begin(AsyncWebServer *server);
 
-		void handleSearchRequest(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleSearchResponse(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleLedCountRequest(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleLedCountResponse(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleSyncConfig(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleEffectIndex(AsyncUDPPacket *packet, unsigned int readOff);
-		void handleEffectData(AsyncUDPPacket *packet, unsigned int readOff);
+		void handleSearchRequest(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleSearchResponse(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleLedCountRequest(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleLedCountResponse(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleSyncData(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleEffectName(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleEffectData(MagicReader *reader, AsyncUDPPacket *packet);
+		void handleSyncConfig(MagicReader *reader, AsyncUDPPacket *packet);
 
-		void startSync(VirtualDevice *device, IPAddress ip, unsigned long id);
+		void startSync(VirtualDevice *device, IPAddress ip, unsigned long id, int mode);
 		void deviceChanged(VirtualDevice *device);
 
 		void doSync(VirtualDevice *master, std::vector<SyncDevice*> *slaves);

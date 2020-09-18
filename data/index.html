@@ -256,6 +256,8 @@ function createDeviceBlock(device) {
 		l.push(row);
 	});
 	
+	var editContainer = $('<div>');
+	
 	var select = createSelectList(l, device.effectIndex, function(val) {
 		$.ajax({
 			url: '/' + device.id + '/set_effect',
@@ -264,7 +266,24 @@ function createDeviceBlock(device) {
 			contentType: 'application/json'
 		});
 	});
-	container.append(select);
+	editContainer.append(select);
+	
+	var modeList = [
+		{name: "Keep Length", value: 0},
+		{name: "Collapse Length", value: 1}
+	];
+	
+	var modeSelect = createSelectList(modeList, 0, function(val) {
+		$.ajax({
+			url: '/edit_device/',
+			type: 'POST',
+			data: JSON.stringify({id: device.id, mode: val}),
+			contentType: 'application/json'
+		});
+	});
+	editContainer.append(modeSelect);
+	
+	container.append(editContainer);
 	
 	/*
 	$.getJSON("/" + device.id + "/get_effects", function(data) {
@@ -322,9 +341,9 @@ function createDeviceBlock(device) {
 		
 		var subContainer = $('<div>');
 		
-		var button = $('<button>', {
+		var syncTimeButton = $('<button>', {
 			'type': 'button',
-			'text': 'Sync!',
+			'text': 'Sync Time',
 			on: {
 				click: function() {
 					// TODO: look for other implementation
@@ -337,10 +356,36 @@ function createDeviceBlock(device) {
 						$.ajax({
 							url: '/' + device.id + '/start_sync',
 							type: 'POST',
-							data: JSON.stringify({ip: sync.ip, id: sync.id}),
+							data: JSON.stringify({ip: sync.ip, id: sync.id, mode: 1}),
 							contentType: 'application/json',
 							success: function(){
-								console.log('Synced!');
+								console.log('Synced Time');
+							}
+						});
+					}
+				}
+			}
+		});
+		
+		var syncEffectButton = $('<button>', {
+			'type': 'button',
+			'text': 'Sync Effect',
+			on: {
+				click: function() {
+					// TODO: look for other implementation
+					var val = select[0].value;
+					
+					if (val != -1) {
+						console.log(lookup[val]);
+						var sync = lookup[val];
+						
+						$.ajax({
+							url: '/' + device.id + '/start_sync',
+							type: 'POST',
+							data: JSON.stringify({ip: sync.ip, id: sync.id, mode: 2}),
+							contentType: 'application/json',
+							success: function(){
+								console.log('Synced Time and Effect');
 							}
 						});
 					}
@@ -349,7 +394,8 @@ function createDeviceBlock(device) {
 		});
 		
 		subContainer.append(select);
-		subContainer.append(button);
+		subContainer.append(syncTimeButton);
+		subContainer.append(syncEffectButton);
 		
 		container.append(subContainer);
 	});

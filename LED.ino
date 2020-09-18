@@ -13,6 +13,8 @@
 
 #include "ESPLogger.h"
 
+#include "Magic.h"
+
 AsyncWebServer server(80);
 
 IPAddress ip(192, 168, 178, 113);

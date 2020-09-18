@@ -5,6 +5,8 @@
 
 #include <string.h>
 
+#include "ESPLogger.h"
+
 SyncManager::SyncManager()
 {
 
@@ -38,30 +40,28 @@ void SyncManager::begin(AsyncWebServer *server)
 		_udp.onPacket([this](AsyncUDPPacket packet) {
 			Serial.println("Received Packet: " + String(packet.length()));
 
-			if (packet.length() > MAGIC_LENGTH && memcmp(packet.data(), MAGIC, MAGIC_LENGTH) == 0) {
-				unsigned int readOff = MAGIC_LENGTH; // ignore the first bytes
+			MagicReader reader(packet.data(), packet.length());
+			unsigned char type = 0;
 
-				unsigned char type = packet.data()[readOff++];
-
-				Serial.println("Correct Magic");
-				Serial.println("Type: " + String(type));
-
-				// TODO: implement using switch
+			if (reader.read(&type)) {
+				Serial.println("Correct Magic - Type: " + String(type));
 
 				if (type == 0) { // device search request
-					handleSearchRequest(&packet, readOff);
+					handleSearchRequest(&reader, &packet);
 				} else if (type == 1) { // device search response
-					handleSearchResponse(&packet, readOff);
+					handleSearchResponse(&reader, &packet);
 				}else if (type == 11) { // led count request
-					handleLedCountRequest(&packet, readOff);
+					handleLedCountRequest(&reader, &packet);
 				} else if (type == 12) { // led count response
-					handleLedCountResponse(&packet, readOff);
-				} else if (type == 13) { // sync config
-					handleSyncConfig(&packet, readOff);
-				} else if (type == 14) { // effect index
-					handleEffectIndex(&packet, readOff);
+					handleLedCountResponse(&reader, &packet);
+				} else if (type == 13) { // sync data
+					handleSyncData(&reader, &packet);
+				} else if (type == 14) { // effect name
+					handleEffectName(&reader, &packet);
 				} else if (type == 15) { // effect data
-					handleEffectData(&packet, readOff);
+					handleEffectData(&reader, &packet);
+				} else if (type == 16) { // sync config
+					handleSyncConfig(&reader, &packet);
 				}
 			}
 		});
@@ -70,48 +70,35 @@ void SyncManager::begin(AsyncWebServer *server)
 	}
 }
 
-void SyncManager::handleSearchRequest(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleSearchRequest(MagicReader *reader, AsyncUDPPacket *packet)
 {
+	unsigned char type = 1; // device search response
 	unsigned int deviceCount = LEDDeviceManager.getDeviceCount();
 
-	// 1 op-byte + 1 * ul count + count * ul
-	unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned int) + deviceCount * sizeof(unsigned long)];
-	unsigned int writeOff = 0;
-
-	memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-	writeOff += MAGIC_LENGTH;
-
-	buf[writeOff] = 1;
-	writeOff += 1;
-
-	memcpy(&buf[writeOff], &deviceCount, sizeof(deviceCount));
-	writeOff += sizeof(deviceCount);
+	MagicWriter writer;
+	writer.write(type);
+	writer.write(deviceCount);
 
 	for (int i = 0; i < deviceCount; i++) {
 		VirtualDevice *device = LEDDeviceManager.getDeviceAt(i);
 		unsigned long id = device->getId();
 
-		memcpy(&buf[writeOff], &id, sizeof(id));
-		writeOff += sizeof(id);
+		writer.write(id);
 	}
 
-	packet->write(buf, writeOff);
+	unsigned char *buf = NULL;
+	unsigned int length = 0;
+	buf = writer.getData(&length);
 
-	delete[] buf;
+	packet->write(buf, length);
 }
 
-void SyncManager::handleSearchResponse(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleSearchResponse(MagicReader *reader, AsyncUDPPacket *packet)
 {
-	if (packet->length() <= sizeof(unsigned int) + readOff)
+	unsigned int deviceCount = 0;
+
+	if (!reader->read(&deviceCount))
 		return;
-
-	Serial.println("Handling Search Response");
-
-	unsigned int deviceCount;
-	memcpy(&deviceCount, &(packet->data()[readOff]), sizeof(deviceCount));
-	readOff += sizeof(deviceCount);
-
-	Serial.println("Found " + String(deviceCount) + " new Devices");
 
 	if (deviceCount > 0) {
 		String ip = packet->remoteIP().toString();
@@ -127,56 +114,56 @@ void SyncManager::handleSearchResponse(AsyncUDPPacket *packet, unsigned int read
 
 		for (int i = 0; i < deviceCount; i++) {
 			unsigned long id;
-			memcpy(&id, &packet->data()[readOff], sizeof(unsigned long));
-			readOff += sizeof(id);
+
+			if (!reader->read(&id)) {
+				return;
+			}
 
 			ids->push_back(id);
 		}
 	}
 }
 
-void SyncManager::handleLedCountRequest(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleLedCountRequest(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
-	memcpy(&id, &packet->data()[readOff], sizeof(id));
-	readOff += sizeof(id);
+
+	if (!reader->read(&id))
+		return;
+
+	Logger.println("Received led count request");
 
 	VirtualDevice *device = LEDDeviceManager.getDevice(id);
 
-	unsigned char *buf = new unsigned char[MAGIC_LENGTH + 1 + sizeof(unsigned long) + sizeof(int)];
-	unsigned int writeOff = 0;
-
-	memcpy(&buf[writeOff], MAGIC, MAGIC_LENGTH);
-	writeOff += MAGIC_LENGTH;
-
-	buf[writeOff++] = 12; // response led count
-
-	memcpy(&buf[writeOff], &id, sizeof(id));
-	writeOff += sizeof(id);
-
-	// respond with -1 if the device doesnt exist anymore
-	int count = -1;
+	unsigned char type = 12; // response led count
+	unsigned int ledCount = 0;
 
 	if (device)
-		count = device->getLedCount();
+		ledCount = device->getLedCount();
 
-	memcpy(&buf[writeOff], &count, sizeof(count));
-	writeOff += sizeof(count);
+	MagicWriter writer;
+	writer.write(type);
+	writer.write(id);
+	writer.write(ledCount);
 
-	packet->write(buf, writeOff);
+	unsigned char *buf = NULL;
+	unsigned int length = 0;
+	buf = writer.getData(&length);
 
-	delete[] buf;
+	Logger.println("Sending led count response...");
+
+	packet->write(buf, length);
 }
 
-void SyncManager::handleLedCountResponse(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleLedCountResponse(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
-	memcpy(&id, &packet->data()[readOff], sizeof(id));
-	readOff += sizeof(id);
+	unsigned int ledCount = 0;
 
-	int ledCount;
-	memcpy(&ledCount, &packet->data()[readOff], sizeof(ledCount));
-	readOff += sizeof(ledCount);
+	if (!reader->read(&id) || !reader->read(&ledCount))
+		return;
+
+	Logger.println("Received led count response");
 
 	IPAddress ip = packet->remoteIP();
 
@@ -191,72 +178,82 @@ void SyncManager::handleLedCountResponse(AsyncUDPPacket *packet, unsigned int re
 	}
 }
 
-void SyncManager:: handleSyncConfig(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager:: handleSyncData(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
-	memcpy(&id, &packet->data()[readOff], sizeof(id));
-	readOff += sizeof(id);
+	double posStart;
+	double posEnd;
+	unsigned long timeOffset;
 
-	VirtualDevice* device = LEDDeviceManager.getDevice(id);
+	if (!reader->read(&id) || !reader->read(&posStart) || !reader->read(&posEnd) || !reader->read(&timeOffset))
+		return;
+
+	Logger.println("Received sync data");
+
+	VirtualDevice *device = LEDDeviceManager.getDevice(id);
 
 	if (device) {
-		double posStart;
-		memcpy(&posStart, &packet->data()[readOff], sizeof(posStart));
-		readOff += sizeof(posStart);
-
-		double posEnd;
-		memcpy(&posEnd, &packet->data()[readOff], sizeof(posEnd));
-		readOff += sizeof(posEnd);
-
-		unsigned long timeOffset;
-		memcpy(&timeOffset, &packet->data()[readOff], sizeof(timeOffset));
-		readOff += sizeof(timeOffset);
-
-
 		device->setPosStart(posStart);
 		device->setPosEnd(posEnd);
-		device->setTimeOffset(timeOffset);
+		device->syncTimeOffset(timeOffset);
 	}
 }
 
-void SyncManager::handleEffectIndex(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleEffectName(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
-	memcpy(&id, &packet->data()[readOff], sizeof(id));
-	readOff += sizeof(id);
+	String name;
+	
+	if(!reader->read(&id) || !reader->read(&name))
+		return;
 
-	VirtualDevice* device = LEDDeviceManager.getDevice(id);
+	Logger.println("Received effect name");
+
+	VirtualDevice *device = LEDDeviceManager.getDevice(id);
 
 	if (device) {
-		String effectName = "";
-		unsigned char c = packet->data()[readOff++];
-
-		while (c != 0) {
-			effectName += c;
-			c = packet->data()[readOff++];
-		}
-
-		device->setEffect(effectName);
+		device->syncEffect(name);
 	}
 }
 
-void SyncManager::handleEffectData(AsyncUDPPacket *packet, unsigned int readOff)
+void SyncManager::handleEffectData(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
-	memcpy(&id, &packet->data()[readOff], sizeof(id));
-	readOff += sizeof(id);
+	unsigned char *data = NULL;
+	unsigned int length = 0;
 
-	VirtualDevice* device = LEDDeviceManager.getDevice(id);
+	if (!reader->read(&id))
+		return;
+
+	data = reader->getRemainingData(&length);
+
+	Logger.println("Received effect data");
+
+	VirtualDevice *device = LEDDeviceManager.getDevice(id);
 
 	if (device) {
-		unsigned char *data = &packet->data()[readOff];
-		unsigned int length = packet->length() - readOff;
-
 		device->setEffect(data, length);
 	}
 }
 
-void SyncManager::startSync(VirtualDevice *device, IPAddress ip, unsigned long id)
+void SyncManager::handleSyncConfig(MagicReader *reader, AsyncUDPPacket *packet)
+{
+	unsigned long id;
+	int mode;
+
+	if (!reader->read(&id) || !reader->read(&mode))
+		return;
+
+	Logger.println("Received sync config");
+
+	VirtualDevice *device = LEDDeviceManager.getDevice(id);
+
+	if (device) {
+		device->setSyncMode(mode);
+	}
+}
+
+void SyncManager::startSync(VirtualDevice *device, IPAddress ip, unsigned long id, int mode)
 {
 	std::vector<SyncDevice*> *syncedList = NULL;
 
@@ -268,24 +265,27 @@ void SyncManager::startSync(VirtualDevice *device, IPAddress ip, unsigned long i
 		_syncs[device] = syncedList;
 	}
 
+	SyncDevice *syncDevice = NULL;
+
 	// check if we are already synced
 	for (std::vector<SyncDevice*>::iterator it = syncedList->begin(); it != syncedList->end(); it++) {
 		if ((*it)->getIp() == ip && (*it)->getId() == id) {
-			return; // this device is already getting synced
+			syncDevice = *it;
 		}
 	}
 
+	if (syncDevice == NULL) {
+		if (ip == WiFi.localIP()) {
+			syncDevice = new InternalSync(id);
+		} else {
+			syncDevice = new ExternalSync(ip, id, &_udp);
+		}
 
-	SyncDevice *syncDevice = NULL;
-
-	if (ip == WiFi.localIP()) {
-		syncDevice = new InternalSync(id);
-	} else {
-		syncDevice = new ExternalSync(ip, id, &_udp);
+		syncedList->push_back(syncDevice);
 	}
-	// TODO: search for this device in the synced list and reset it
 
-	syncedList->push_back(syncDevice);
+	syncDevice->setSyncConfig(WiFi.localIP(), device->getId(), mode);
+	syncDevice->retrieveLedCount();
 
 	deviceChanged(device);
 }
@@ -334,8 +334,6 @@ void SyncManager::deviceChanged(VirtualDevice *device)
 		for (std::vector<SyncDevice*>::iterator it2 = it->second->begin(); it2 != it->second->end(); it2++) {
 			SyncDevice* syncDevice = *it2;
 
-			Serial.println("Syncing Effect n: " + String(syncDevice->getId()));
-
 			syncDevice->setEffect(effectName);
 		}
 
@@ -361,7 +359,8 @@ void SyncManager::doSync(VirtualDevice *master, std::vector<SyncDevice*> *slaves
 	master->setPosStart(posStart);
 	master->setPosEnd(posEnd);
 
-	unsigned long timeOffset = master->getTimeOffset();
+	// unsigned long timeOffset = master->getTimeOffset();
+	unsigned long timeOffset = millis();
 
 	for (std::vector<SyncDevice*>::iterator it = slaves->begin(); it != slaves->end(); it++) {
 		posStart = posEnd;
@@ -415,17 +414,23 @@ void SyncManager::update()
 	for (std::map<VirtualDevice*, std::vector<SyncDevice*>*>::iterator it = _syncs.begin(); it != _syncs.end(); it++) {
 		VirtualDevice* master = it->first;
 
+		bool shouldSync = false;
+
 		for (std::vector<SyncDevice*>::iterator it2 = it->second->begin(); it2 != it->second->end(); it2++) {
 			SyncDevice* syncDevice = *it2;
 
 			if (syncDevice->needsSync()) {
 				if (syncDevice->getLedCount() > 0) {
-					// TODO: sync!
-					doSync(master, it->second);
+					shouldSync = true;
+					break;
 				} else {
 					syncDevice->retrieveLedCount();
 				}
 			}
+		}
+
+		if (shouldSync) {
+			doSync(master, it->second);
 		}
 	}
 

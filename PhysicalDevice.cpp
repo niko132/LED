@@ -6,7 +6,7 @@ PhysicalDevice::PhysicalDevice(unsigned int ledCount) :
     _strip(ledCount)
 {
     _ledCount = ledCount;
-	_mirror = true;	
+	_mirror = true;
     _pixelBuf = new unsigned char[ledCount * 3]; // 3 colors per led
 }
 
@@ -42,10 +42,10 @@ void PhysicalDevice::update()
 {
     for (int i = 0; i < _ledCount; i++) {
 		int index = i;
-		
+
 		if (_mirror)
 			index = _ledCount - i - 1;
-		
+
         _strip.SetPixelColor(index, RgbColor(_pixelBuf[i * 3], _pixelBuf[i * 3 + 1], _pixelBuf[i * 3 + 2]));
     }
 

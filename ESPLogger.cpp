@@ -1,35 +1,34 @@
 #include "ESPLogger.h"
 
-ESPLogger::ESPLogger() : _telnetServer(23) {
-
+ESPLogger::ESPLogger() {
+    _telnetServer = new AsyncServer(23);
 };
 
 void ESPLogger::begin() {
-    _telnetServer.begin();
-    _telnetServer.setNoDelay(true);
+    _telnetServer->onClient([this](void *arg, AsyncClient *client) {
+        _telnet = client;
+    }, _telnetServer);
+    _telnetServer->begin();
 
     update();
 };
 
 void ESPLogger::update() {
-    if (_telnetServer.hasClient()) {
-        if (!_telnet || !_telnet.connected()) {
-            if (_telnet)
-                _telnet.stop();
 
-            _telnet = _telnetServer.available();
-        } else {
-            _telnetServer.available().stop();
-        }
-    }
 };
 
-size_t ESPLogger::write(uint8_t c) {
-    return _telnet.write(c);
+size_t ESPLogger::write(const uint8_t c) {
+    if (_telnet)
+        return _telnet->write((const char*) &c);
+
+    return 0;
 };
 
 size_t ESPLogger::write(const uint8_t *buffer, size_t size) {
-    return _telnet.write(buffer, size);
+    if (_telnet)
+        return _telnet->write((const char*) buffer, size);
+
+    return 0;
 };
 
 ESPLogger Logger;

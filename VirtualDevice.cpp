@@ -15,6 +15,7 @@
 #include "CollapseLengthAlgorithm.h"
 
 #include "SyncTime.h"
+#include "SyncEffect.h"
 
 #include "ESPLogger.h"
 
@@ -172,10 +173,15 @@ void VirtualDevice::begin(AsyncWebServer *server)
 
 		String ip = "";
 		unsigned long id = 0;
+        int mode = 0;
 
 		if (jsonObj.containsKey("ip") && jsonObj.containsKey("id")) {
 			ip = jsonObj["ip"].as<String>();
 			id = jsonObj["id"].as<unsigned long>();
+
+            if (jsonObj.containsKey("mode")) {
+                mode = jsonObj["mode"].as<int>();
+            }
 
 			Serial.println("Sync: " + ip + " - " + String(id));
 
@@ -183,7 +189,7 @@ void VirtualDevice::begin(AsyncWebServer *server)
 			ipAddress.fromString(ip);
 
 
-			LEDSyncManager.startSync(this, ipAddress, id);
+			LEDSyncManager.startSync(this, ipAddress, id, mode);
 
 
 			request->send(200, "text/plain", "Start sync: " + ip + " - " + String(id));
@@ -294,6 +300,34 @@ void VirtualDevice::setMode(int mode)
     }
 }
 
+void VirtualDevice::setSyncMode(int mode)
+{
+    if (mode != _syncMode) {
+        _syncMode = mode;
+
+        unsigned long timeOffset = 0;
+        Effect *effect = NULL;
+        unsigned int length = getLedCount();
+
+        if (_syncAlgorithm) {
+            timeOffset = _syncAlgorithm->getTimeOffset();
+            effect = _syncAlgorithm->getEffect();
+
+            delete _syncAlgorithm;
+            _syncAlgorithm = NULL;
+        }
+
+        if (mode == 1) {
+            _syncAlgorithm = new SyncTime(timeOffset, effect, length);
+        } else {
+            _syncAlgorithm = new SyncEffect(timeOffset, effect, length);
+        }
+
+        LEDSyncManager.deviceChanged(this);
+        serialize();
+    }
+}
+
 void VirtualDevice::setEffect(String name)
 {
     Effect *effect = LEDEffectManager.getEffect(name, _palette);
@@ -322,6 +356,7 @@ void VirtualDevice::setEffect(unsigned char *buf, unsigned int length)
         effect = NULL;
     }
 
+    LEDSyncManager.deviceChanged(this);
 	serialize();
 }
 
@@ -341,6 +376,30 @@ void VirtualDevice::setPosEnd(double posEnd)
 	_posEnd = posEnd;
 	serialize();
 }
+
+
+void VirtualDevice::syncTimeOffset(unsigned int timeOffset)
+{
+    Logger.println("Received time sync: " + String(timeOffset));
+
+
+    timeOffset = millis() - timeOffset; // use this to correct the difference between the synced devices
+    _syncAlgorithm->syncTimeOffset(timeOffset);
+}
+
+void VirtualDevice::syncEffect(String name)
+{
+    Logger.println("Received effect sync: " + name);
+
+    Effect *effect = LEDEffectManager.getEffect(name, _palette);
+    effect = _syncAlgorithm->syncEffect(effect);
+
+    if (effect) {
+        delete effect;
+        effect = NULL;
+    }
+}
+
 
 void VirtualDevice::resetCovered()
 {

@@ -14,9 +14,10 @@
 
 class VirtualDevice {
     private:
-        PhysicalDevice *_device;
-        int _mode;
-        unsigned long _id;
+        PhysicalDevice *_device = NULL;
+        int _mode = 0;
+        int _syncMode = 0;
+        unsigned long _id = 0;
 
         CoverAlgorithm *_coverAlgorithm = NULL;
         SyncAlgorithm *_syncAlgorithm = NULL;
@@ -43,9 +44,14 @@ class VirtualDevice {
         void setEndIndex(int endIndex);
         void setMode(int mode);
 
+        void setSyncMode(int mode);
+
 		void setEffect(String name);
 		void setEffect(unsigned char *buf, unsigned int length);
 		void setTimeOffset(unsigned long timeOffset);
+
+        void syncTimeOffset(unsigned int timeOffset);
+        void syncEffect(String name);
 
 		void setPosStart(double posStart);
 		void setPosEnd(double posEnd);

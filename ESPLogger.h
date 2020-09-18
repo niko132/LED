@@ -1,12 +1,13 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <ESP8266WiFi.h>
+#include <ESPAsyncTCP.h>
+#include <Print.h>
 
 class ESPLogger : public Print {
     private:
-        WiFiServer _telnetServer;
-        WiFiClient _telnet;
+        AsyncServer *_telnetServer = NULL;
+        AsyncClient *_telnet = NULL;
 
     public:
         ESPLogger();
