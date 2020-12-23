@@ -17,7 +17,7 @@
 
 AsyncWebServer server(80);
 
-IPAddress ip(192, 168, 178, 113);
+IPAddress ip(192, 168, 178, 111);
 
 IPAddress gateway(192, 168, 178, 1);
 IPAddress subnet(255, 255, 255, 0);

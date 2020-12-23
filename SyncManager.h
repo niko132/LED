@@ -233,6 +233,7 @@ class SyncManager {
 		void handleEffectName(MagicReader *reader, AsyncUDPPacket *packet);
 		void handleEffectData(MagicReader *reader, AsyncUDPPacket *packet);
 		void handleSyncConfig(MagicReader *reader, AsyncUDPPacket *packet);
+		void handlePixelData(MagicReader *reader, AsyncUDPPacket *packet);
 
 		void startSync(VirtualDevice *device, IPAddress ip, unsigned long id, int mode);
 		void deviceChanged(VirtualDevice *device);

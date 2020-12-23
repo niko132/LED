@@ -3,16 +3,16 @@
 
 #include "SyncAlgorithm.h"
 
-class syncPixelData : public SyncAlgorithm {
+class SyncPixels : public SyncAlgorithm {
     protected:
         unsigned char *_pixelData = NULL;
 
     public:
-        SyncAlgorithm(unsigned long timeOffset, Effect *effect, unsigned int length) : SyncAlgorithm(timeOffset, effect, length) {
+        SyncPixels(unsigned long timeOffset, Effect *effect, unsigned int length) : SyncAlgorithm(timeOffset, effect, length) {
             _pixelData = new unsigned char[length * 3];
         };
 
-        ~SyncAlgorithm() {
+        ~SyncPixels() {
             if (_pixelData) {
                 delete[] _pixelData;
                 _pixelData = NULL;
@@ -32,7 +32,7 @@ class syncPixelData : public SyncAlgorithm {
             _pixelData = new unsigned char[length * 3];
         };
 
-        void syncPixelData(unsigned char *pixelData unsigned int length) {
+        void syncPixelData(unsigned char *pixelData, unsigned int length) {
             if (_length * 3 < length) {
                 length = _length * 3; // _length is the buffer size -> max char count
             }

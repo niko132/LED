@@ -38,14 +38,10 @@ void SyncManager::begin(AsyncWebServer *server)
 		Serial.println("::UDP::");
 
 		_udp.onPacket([this](AsyncUDPPacket packet) {
-			Serial.println("Received Packet: " + String(packet.length()));
-
 			MagicReader reader(packet.data(), packet.length());
 			unsigned char type = 0;
 
 			if (reader.read(&type)) {
-				Serial.println("Correct Magic - Type: " + String(type));
-
 				if (type == 0) { // device search request
 					handleSearchRequest(&reader, &packet);
 				} else if (type == 1) { // device search response
@@ -62,6 +58,8 @@ void SyncManager::begin(AsyncWebServer *server)
 					handleEffectData(&reader, &packet);
 				} else if (type == 16) { // sync config
 					handleSyncConfig(&reader, &packet);
+				} else if (type == 17) { // raw pixel data
+					handlePixelData(&reader, &packet);
 				}
 			}
 		});
@@ -188,8 +186,6 @@ void SyncManager:: handleSyncData(MagicReader *reader, AsyncUDPPacket *packet)
 	if (!reader->read(&id) || !reader->read(&posStart) || !reader->read(&posEnd) || !reader->read(&timeOffset))
 		return;
 
-	Logger.println("Received sync data");
-
 	VirtualDevice *device = LEDDeviceManager.getDevice(id);
 
 	if (device) {
@@ -203,7 +199,7 @@ void SyncManager::handleEffectName(MagicReader *reader, AsyncUDPPacket *packet)
 {
 	unsigned long id;
 	String name;
-	
+
 	if(!reader->read(&id) || !reader->read(&name))
 		return;
 
@@ -250,6 +246,24 @@ void SyncManager::handleSyncConfig(MagicReader *reader, AsyncUDPPacket *packet)
 
 	if (device) {
 		device->setSyncMode(mode);
+	}
+}
+
+void SyncManager::handlePixelData(MagicReader *reader, AsyncUDPPacket *packet)
+{
+	unsigned long id;
+	unsigned int length = 0;
+	unsigned char* pixelData = NULL;
+
+	if (!reader->read(&id))
+		return;
+
+	pixelData = reader->getRemainingData(&length);
+
+	VirtualDevice *device = LEDDeviceManager.getDevice(id);
+
+	if (device) {
+		device->syncPixelData(pixelData, length);
 	}
 }
 

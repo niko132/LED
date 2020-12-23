@@ -16,6 +16,7 @@
 
 #include "SyncTime.h"
 #include "SyncEffect.h"
+#include "SyncPixels.h"
 
 #include "ESPLogger.h"
 
@@ -319,8 +320,10 @@ void VirtualDevice::setSyncMode(int mode)
 
         if (mode == 1) {
             _syncAlgorithm = new SyncTime(timeOffset, effect, length);
-        } else {
+        } else if (mode == 2) {
             _syncAlgorithm = new SyncEffect(timeOffset, effect, length);
+        } else {
+            _syncAlgorithm = new SyncPixels(timeOffset, effect, length);
         }
 
         LEDSyncManager.deviceChanged(this);
@@ -398,6 +401,11 @@ void VirtualDevice::syncEffect(String name)
         delete effect;
         effect = NULL;
     }
+}
+
+void VirtualDevice::syncPixelData(unsigned char *pixelData, unsigned int length)
+{
+    _syncAlgorithm->syncPixelData(pixelData, length);
 }
 
 

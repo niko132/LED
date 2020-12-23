@@ -6,7 +6,7 @@ PhysicalDevice::PhysicalDevice(unsigned int ledCount) :
     _strip(ledCount)
 {
     _ledCount = ledCount;
-	_mirror = true;
+	_mirror = false;
     _pixelBuf = new unsigned char[ledCount * 3]; // 3 colors per led
 }
 

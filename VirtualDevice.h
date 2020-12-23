@@ -52,6 +52,7 @@ class VirtualDevice {
 
         void syncTimeOffset(unsigned int timeOffset);
         void syncEffect(String name);
+        void syncPixelData(unsigned char *pixelData, unsigned int length);
 
 		void setPosStart(double posStart);
 		void setPosEnd(double posEnd);
